@@ -1,3 +1,20 @@
+//===========================================================================
+// Description:
+//	Photon weather station includes temperature, humidity, pressure, rain in inches,
+// wind speed, direction of wind, and ionizing radiation data from UV and geiger counter sensors. 
+// Based on the example code from Haodong Liang who used ThingSpeak, but modified for it also to be 
+// used for CloudMQTT. Link to his project: https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0
+//  
+// Authors:
+//	- Sid Kasat, cs Junior@UC Irvine
+//	- Mindy Salors, EE Junior@UC Irvine
+//
+//Project Managers: Dr. Michael Klopfer, Prof. GP Li.
+//California Institute for Telecommunications and Information Technology (Calit2), 2017
+//University of California, Irvine
+//Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
+//===========================================================================
+
 // This #include statement was automatically added by the Particle IDE.
 #include <Adafruit_SI1145.h>
 
@@ -17,18 +34,7 @@
 #include <MQTT.h>
 #define TCAADDR 0x70
 
-//===========================================================================
-// Description:
-//	Photon weather station includes temperature, humidity, pressure, rain in inches,
-// wind speed, direction of wind, and ionizing radiation data. 
-// Grabbed code from Haodong Liang who used ThingSpeak, but allowed it also to be 
-// used for CloudMQTT. Link to his project: 
-// https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0
-//  
-// Authors:
-//	- Sid Kasat, cs Junior@UC Irvine
-//	- Mindy Salors, EE Junior@UC Irvine
-//===========================================================================
+//******************************************************************************************
 
 unsigned long thingspeakChannelNumber = 265303;
 char thingSpeakWriteAPIKey[] = "9RDFHERSXR7J7VCQ";
