@@ -6,8 +6,8 @@
 // used for CloudMQTT. Link to his project: https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0
 //  
 // Authors:
-//	- Sid Kasat, cs Junior@UC Irvine
-//	- Mindy Salors, EE Junior@UC Irvine
+//	- Sid Kasat, CS Junior @ UC Irvine
+//	- Mindy Saylors, EE Junior @ UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 //California Institute for Telecommunications and Information Technology (Calit2), 2017
