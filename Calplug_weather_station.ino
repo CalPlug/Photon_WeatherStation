@@ -1,7 +1,8 @@
 //===========================================================================
 // Description:
 //	Photon weather station includes temperature, humidity, pressure, rain in inches,
-// wind speed, direction of wind, and ionizing radiation data from UV and geiger counter sensors. 
+// wind speed, direction of wind, and ionizing radiation data from UV and geiger counter sensors.
+// The Geiger Counter that was interfaced via UART is by Mighty Ohm:  http://mightyohm.com/blog/products/geiger-counter/
 // Based on the example code from Haodong Liang who used ThingSpeak, but modified for it also to be 
 // used for CloudMQTT. Link to his project: https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0
 //  
