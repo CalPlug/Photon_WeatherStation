@@ -6,8 +6,6 @@ This project is designed for a local weather station using a microcontroller, Pa
 // Photon weather station includes temperature, humidity, pressure, rain in inches,
 // wind speed, direction of wind, and includes extended sensing of ionizing radiation data from UV radiation and geiger counter sensors.
 // The Geiger Counter that was interfaced via UART is by Mighty Ohm:  http://mightyohm.com/blog/products/geiger-counter/
-// Based on the example code from Haodong Liang who used ThingSpeak, but modified for use with MQTT, with CloudMQTT interfacing shown.
-// Link to his project: https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0
 //  
 // Authors:
 //	- Sid Kasat, CS Junior @ UC Irvine
