@@ -16,14 +16,9 @@
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
 
+
 // This #include statement was automatically added by the Particle IDE.
 #include <Adafruit_SI1145.h>
-
-// This #include statement was automatically added by the Particle IDE.
-#include <ThingSpeak.h>
-
-// This #include statement was automatically added by the Particle IDE.
-#include "ThingSpeak/ThingSpeak.h"
 
 // This #include statement was automatically added by the Particle IDE.
 #include "SparkFun_Photon_Weather_Shield_Library/SparkFun_Photon_Weather_Shield_Library.h"
@@ -34,11 +29,6 @@
 // This #include statement was automatically added by the Particle IDE.
 #include <MQTT.h>
 #define TCAADDR 0x70
-
-//******************************************************************************************
-
-unsigned long thingspeakChannelNumber = 265303;
-char thingSpeakWriteAPIKey[] = "9RDFHERSXR7J7VCQ";
 
 // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
 unsigned int sensorCapturePeriod = 100; //0.1 second
@@ -56,84 +46,27 @@ unsigned int timeNextPublish;
 
 void tcaselect(uint8_t i) {
   if (i > 7) return;
- 
   Wire.beginTransmission(TCAADDR);
   Wire.write(1 << i);
   Wire.endTransmission();  
 }
 
 void setup() {
-    initializeThingSpeak();
-	initializeCloudMQTT();
+    initializeCloudMQTT();
     initializeTempHumidityAndPressure();
     initializeRainGauge();
     initializeAnemometer();
     initializeWindVane();
-	initializeGeigerCounter();
-	tcaselect(4);
-	    initializeUV();
-    
+    initializeGeigerCounter();
+    tcaselect(4);
+	initializeUV();
+    Serial.begin(9600);
     // Schedule the next sensor reading and publish events
     timeNextSensorReading = millis() + sensorCapturePeriod;
     timeNextPublish = millis() + publishPeriod; 
-	timeNextGeigerReading = millis() + sensorCapturePeriod; //start reading shortly after initlization
+    timeNextGeigerReading = millis() + sensorCapturePeriod; //start reading shortly after initlization
 }
 
-
-
-//===========================================================
-// publish to particle
-//===========================================================
-
-void publishToParticle(float tempF,float humidityRH,float pressureKPa,float rainInches,float windMPH,float gustMPH,float windDegrees, float UV) {
-    Particle.publish("weather", 
-		String::format("%0.1f°F, %0.0f%%, %0.2f kPa, %0.2f in, Avg:%0.0fmph, Gust:%0.0fmph, Dir:%0.0f°, UVIndex:%0.2f",
-			tempF,humidityRH,pressureKPa,rainInches,windMPH,gustMPH,windDegrees,UV),
-		60 , PRIVATE);    
-}
-void publishToParticle(float cpsPub, float cpmPub, float uSv_hrPub) {
-    Particle.publish("weather", 
-		String::format("%f, %f, %f",cpsPub,cpmPub,uSv_hrPub), 
-		60 , PRIVATE);    
-}
-
-
-
-//===========================================================
-// ThingSpeak
-//===========================================================
-TCPClient clientThingSpeak;
-
-void initializeThingSpeak() {
-    ThingSpeak.begin(clientThingSpeak);
-}
-
-void publishToThingSpeak(float tempF,float humidityRH,float pressureKPa,float rainInches,float windMPH,float gustMPH,float windDegrees, float UV) {
-    // To write multiple fields, you set the various fields you want to send
-    ThingSpeak.setField(1,tempF);
-    ThingSpeak.setField(2,humidityRH);
-    ThingSpeak.setField(3,pressureKPa);
-    ThingSpeak.setField(4,rainInches);
-    ThingSpeak.setField(5,windMPH);
-    ThingSpeak.setField(6,gustMPH);
-    ThingSpeak.setField(7,windDegrees);
-	ThingSpeak.setField(11,UV);
-	
-    
-    // Then you write the fields that you've set all at once.
-    ThingSpeak.writeFields(thingspeakChannelNumber, thingSpeakWriteAPIKey);
-}
-
-void publishToThingSpeak(float cpsPub, float cpmPub, float uSv_hrPub) {
-    // To write multiple fields, you set the various fields you want to send
-    ThingSpeak.setField(8,cpsPub);
-    ThingSpeak.setField(9,cpmPub); // thingspeak wont record this many fields without a membership
-    ThingSpeak.setField(10,uSv_hrPub); // thingspeak wont record this many fields without a membership
-	
-    // Then you write the fields that you've set all at once.
-    ThingSpeak.writeFields(thingspeakChannelNumber, thingSpeakWriteAPIKey);
-}
-  
 //===========================================================
 // MQTT Client
 //===========================================================
@@ -152,14 +85,12 @@ void publishToThingSpeak(float cpsPub, float cpmPub, float uSv_hrPub) {
          RGB.color(255, 255, 255);
  }
 
- MQTT client("m12.cloudmqtt.com", 14668, callback);
+ MQTT client("CLIENT", PORT, callback);
  void initializeCloudMQTT() {
-     client.connect("m12.cloudmqtt.com", "abtziegr", "TLJlAwyK0_NG");
+     client.connect("CLIENT", "USERNAME", "PASSWORD");
     // publish/subscribe
      if (client.isConnected()) {
        client.publish("CONNECTION_STATUS","Connected.");
-       Serial.println("Connected!!!!!!!!!!!!");
-			//client.subscribe("inTopic/message");
      }
  }
 
@@ -167,40 +98,40 @@ void publishToThingSpeak(float cpsPub, float cpmPub, float uSv_hrPub) {
     // To write multiple fields, you set the various fields you want to send
  	char payload[255];
 
- 	snprintf(payload, sizeof(payload), "%0.1f F", tempF);
- 	client.publish("Temperature in Fahrenheit", payload);
+ 	snprintf(payload, sizeof(payload), "%0.1f", tempF);
+ 	client.publish("TemperatureF", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.2f C", tempC);
- 	client.publish("Temperature in Celsius", payload);
+ 	snprintf(payload, sizeof(payload), "%0.2f", tempC);
+ 	client.publish("TemperatureC", payload);
 	
  	snprintf(payload, sizeof(payload), "%0.1f", humidityRH);
  	client.publish("Humidity", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.1f KPa", pressureKPa);
- 	client.publish("Pressure in pascals", payload);
+ 	snprintf(payload, sizeof(payload), "%0.1f", pressureKPa);
+ 	client.publish("Pressure_ KPa", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.1f mph", windMPH);
- 	client.publish("Wind Speed", payload);
+ 	snprintf(payload, sizeof(payload), "%0.1f", windMPH);
+ 	client.publish("Wind_Speed_MPH", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.0f degrees", windDegrees);
- 	client.publish("Wind Degrees", payload);
+ 	snprintf(payload, sizeof(payload), "%0.0f", windDegrees);
+ 	client.publish("Wind_Degrees", payload);
 
 	snprintf(payload, sizeof(payload), "%0.2f", UV);
- 	client.publish("UV Index", payload);
+ 	client.publish("UV_Index", payload);
  }
 
  void publishToMQTT(float cpsPub, float cpmPub, float uSv_hrPub) { 
     // To write multiple fields, you set the various fields you want to send
  	char payload[255];
 
- 	snprintf(payload, sizeof(payload), "%0.0f cps", cpsPub);
- 	client.publish("Geiger counter counts per second", payload);
+ 	snprintf(payload, sizeof(payload), "%0.0f", cpsPub);
+ 	client.publish("Geiger_counter_counts_per_second", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.0f cpm", cpmPub);
- 	client.publish("Geiger counter counts per minute", payload);
+ 	snprintf(payload, sizeof(payload), "%0.0f", cpmPub);
+ 	client.publish("Geiger_counter_counts_per_minute", payload);
 	
- 	snprintf(payload, sizeof(payload), "%0.2f uSv/hr", uSv_hrPub);
- 	client.publish("MicroSieverts per hour", payload);
+ 	snprintf(payload, sizeof(payload), "%0.2f", uSv_hrPub);
+ 	client.publish("MicroSieverts_per_hour_uSv/hr", payload);
 	
  }
 
@@ -222,7 +153,7 @@ void initializeTempHumidityAndPressure() {
     //Set to Barometer Mode
     sensor.setModeBarometer();
     // Set Oversample rate
-    sensor.setOversampleRate(7); // why set this to 7? is it because that is what you got from sample code, or is there a reason?
+    sensor.setOversampleRate(7);
     //Necessary register calls to enble temp, baro and alt
     sensor.enableEventFlags(); 
     
@@ -247,7 +178,7 @@ void captureTempHumidityPressure() {
   float humidityRH = sensor.getRH();
   
   //If the result is reasonable, add it to the running mean
-  if(humidityRH > 0 && humidityRH < 105) // It's theoretically possible to get supersaturation humidity levels over 100%
+  if(humidityRH > 0 && humidityRH < 105) 
   {
       // Add the observation to the running sum, and increment the number of observations
       humidityRHTotal += humidityRH;
@@ -255,9 +186,6 @@ void captureTempHumidityPressure() {
   }
 
   // Measure Temperature from the HTU21D or Si7021
-  // Temperature is measured every time RH is requested.
-  // It is faster, therefore, to read it from previous RH
-  // measurement with getTemp() instead with readTemp()
   float tempF = sensor.getTempF();
   
   //If the result is reasonable, add it to the running mean
@@ -280,7 +208,7 @@ void captureTempHumidityPressure() {
 
   //Measure Pressure from the MPL3115A2
   float pressurePascals = sensor.readPressure();
-  
+
   //If the result is reasonable, add it to the running mean
   // What's reasonable? http://findanswers.noaa.gov/noaa.answers/consumer/kbdetail.asp?kbid=544
   if(pressurePascals > 80000 && pressurePascals < 110000)
@@ -289,7 +217,6 @@ void captureTempHumidityPressure() {
       pressurePascalsTotal += pressurePascals;
       pressurePascalsReadingCount++;
   }
-  
   return;
 }
 
@@ -347,10 +274,10 @@ unsigned int lastRainEvent;
 float RainScaleInches = 0.011; // Each pulse is .011 inches of rain
 
 void initializeRainGauge() {
-  pinMode(RainPin, INPUT_PULLUP);
+  //pinMode(RainPin, INPUT_PULLUP);
   rainEventCount = 0;
   lastRainEvent = 0;
-  attachInterrupt(RainPin, handleRainEvent, FALLING);
+  //attachInterrupt(RainPin, handleRainEvent, FALLING);
   return;
   }
   
@@ -358,7 +285,6 @@ void handleRainEvent() {
     // Count rain gauge bucket tips as they occur
     // Activated by the magnet and reed switch in the rain gauge, attached to input D2
     unsigned int timeRainEvent = millis(); // grab current time
-    
     // ignore switch-bounce glitches less than 10mS after initial edge
     if(timeRainEvent - lastRainEvent < 10) {
       return;
@@ -538,32 +464,6 @@ void initializeGeigerCounter(){
 	return;
 }
 
-// int countcomma = 0; 	// for Geiger Counter Data Logging (not needed ***)
-
-// //Geiger Counter Data variables (tempo)
-// char cps[5]="";			
-// char cpm[5]="";
-// char usvHR[10]="";
-// char mode_speed[10]="";   
-
-
-// mode_speed--
-//	There are three, modes. Normally, the sample period is LONG_PERIOD 
-//	(default 60 seconds). This is SLOW averaging mode. If the last five measured counts 
-//	exceed a preset threshold, the sample period switches to SHORT_PERIOD seconds 
-//	(default 5 seconds). This is FAST mode, and is more responsive but less accurate. 
-//	Finally, if CPS > 255, we report CPS*60 and switch to INST mode, since we can’t 
-//	store data in the (8-bit) sample buffer.
-
-
-// //for averaging values
-// float cpsTotal=0.0;
-// unsigned int cpsReadingCount = 0;
-// float cpmTotal=0.0;
-// unsigned int cpmReadingCount = 0;
-// float usvHRTotal=0.0;
-// unsigned int usvHRReadingCount = 0;
-
 
 // Values for get and reset function
 float cpsval=0;			
@@ -583,47 +483,19 @@ void captureGeigerValues(){ //Captures values (uses a while loop which may disru
 	char usvHR[10]="";
 	char mode_speed[10]="";  	
 
-	
 	do{
-		
 		char c= (uint8_t)Serial1.read(); //Read in the data (one char each loop)
-		
 		if(c=='\n' && secondNewLine == false){
 			secondNewLine = true;
-			
 		}else{
-			
 			if(c==','){
 				countcomma++; // increment the comma count for each comma
-				
 			} else if(c=='\n'){ // if the entire line of data has been recived then type cast
 				cpsval = atof(cps); //Type cast to float
 				cpmval = atof(cpm); //Type cast to float
 				usvHRval = atof(usvHR); //Type cast to float
 				mode_speedval = mode_speed;
-				
-				
-				// //Print varibles
-				// Serial.print("\nCPS: ");
-				// Serial.print(cpsval);
-				// Serial.print("\nCPM: ");
-				// Serial.print(cpmval);
-				// Serial.print("\nuSv/hr: ");
-				// Serial.print(usvHRval);
-				// Serial.print("\nMode Speed: ");
-				// Serial.println(mode_speedval);
-				
-				// countcomma = 0; // Reset comma counter
-				
-				// Need to reset values every so often. 
-				// At the end of the line, may be best.
-				// memset(cps, 0, sizeof(cps));
-				// memset(cpm, 0, sizeof(cpm));
-				// memset(usvHR, 0, sizeof(usvHR));
-				// memset(mode_speed, 0, sizeof(mode_speed));
-				
 				dataIsNotCollected = false;
-				
 			} else{
 				switch(countcomma){
 					case 1: //If one comma (CPS) and so forth for the rest of the cases
@@ -653,7 +525,6 @@ float getAndResetCPS()
 	if(mode_speedval == " INST") { // Recorded cps value is cps/60  when in INST mode (from geiger manual)
 		cpsval*=60;
 	}
-	
 	float result = cpsval;
 	cpsval = 0;
 	mode_speedval = "";
@@ -664,7 +535,6 @@ float getAndResetCPM()
 {
     float result = cpmval;
 	cpmval = 0;
-	
     return result;
 }
 
@@ -672,7 +542,6 @@ float getAndResetuSv_hr()
 {
     float result = usvHRval;
 	usvHRval = 0;
-	
     return result;
 }
 
@@ -686,58 +555,39 @@ void initializeUV()
 
 float getUVReadings()
 {
-	//Serial.print("Vis: "); Serial.println(uv.readVisible());
-	//Serial.print("IR: "); Serial.println(uv.readIR());
-
 	float UVindex = uv.readUV();
 	// the index is multiplied by 100 so to get the
 	// integer index, divide by 100!
-	UVindex /= 100.0;  
-	return UVindex;
+	return UVindex/100.0;  
 }
-
-// char* getAndResetModeSpeed() ///should I be having this function check the appropriate values for mode_speed? probably should have it go in where the actual storing of the variable first starts, captureGeigerValues.
-// {
-    // if(mode_speed != " SLOW" || mode_speed != " FAST" || mode_speed != " INST") {
-        // return 0;
-    // } else{
-	// char result = mode_speed;
-	// mode_speed = "";
-	
-    // return result;
-// }
 
 void loop() {
 
     // Capture any sensors that need to be polled (temp, humidity, pressure, wind vane)
     // The rain and wind speed sensors use interrupts, and so data is collected "in the background"
     
-    if(timeNextSensorReading <= millis()) {
+    //if(timeNextSensorReading <= millis()) {
         captureTempHumidityPressure();
         captureWindVane();
-
         // Schedule the next sensor reading
         timeNextSensorReading = millis() + sensorCapturePeriod;
-    }
+    //}
 	
 	if(timeNextGeigerReading <= millis()){ // turn on geiger counter
-	
 		digitalWrite(GeigerPowerPin, LOW);
-		
 		if(timeNextGeigerReading+MINUTE <= millis()){ // start taking data after a minute
 			captureGeigerValues();
 			float cpsPub = getAndResetCPS();
 			float cpmPub = getAndResetCPM();
 			float uSv_hrPub = getAndResetuSv_hr();
 			//char  modeSpeedPub = getAndResetModeSpeed();
+			Serial.println(cpsPub);
+			Serial.println(cpmPub);
+			Serial.println(uSv_hrPub);
 			
-	
-			publishToParticle(cpsPub,cpmPub,uSv_hrPub);
-			publishToThingSpeak(cpsPub,cpmPub,uSv_hrPub);
 			publishToMQTT(cpsPub, cpmPub, uSv_hrPub);
 			if(timeNextGeigerReading + 2*MINUTE <= millis()){
 				timeNextGeigerReading = 8*MINUTE+millis();
-				
 				digitalWrite(GeigerPowerPin, HIGH);
 			}
 		}	
@@ -746,29 +596,25 @@ void loop() {
 	
     // Publish the data collected to Particle and to ThingSpeak
     if(timeNextPublish <= millis()) {
-        
         // Get the data to be published
         float tempF = getAndResetTempF();
 		float tempC = getAndResetTempC(); // *** need to make
-		Serial.println("After Temp");
+		//Serial.println("After Temp");
         float humidityRH = getAndResetHumidityRH();
-        Serial.println("After Humidity");
+        //Serial.println("After Humidity");
         float pressureKPa = getAndResetPressurePascals() / 1000.0;
-        Serial.println("After Press");
+        //Serial.println("After Press");
         float rainInches = getAndResetRainInches();
-        Serial.println("After Rain");
+        //Serial.println("After Rain");
         float gustMPH;
         float windMPH = getAndResetAnemometerMPH(&gustMPH);
         float windDegrees = getAndResetWindVaneDegrees();
-        Serial.println("After Wind");
+        //Serial.println("After Wind");
 		tcaselect(4);
 		    float UVIndex = getUVReadings();
-        //float UVIndex=0;
-        // Publish the data                    
-        //publishToParticle(tempF,humidityRH,pressureKPa,rainInches,windMPH,gustMPH,windDegrees,UVIndex);
-        //publishToThingSpeak(tempF,humidityRH,pressureKPa,rainInches,windMPH,gustMPH,windDegrees,UVIndex);
-		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex); // *** and gust?
-		Serial.println("After Publish");
+
+		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex);
+		//Serial.println("After Publish");
         // Schedule the next publish event
         timeNextPublish = millis() + publishPeriod;
     }
