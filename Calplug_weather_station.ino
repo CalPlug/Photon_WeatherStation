@@ -161,7 +161,7 @@ void setBrowoutResetLevel() {
 
  MQTT client("m12.cloudmqtt.com", 14668, callback);
  void initializeCloudMQTT() {
-     client.connect("m12.cloudmqtt.com", "abtziegr", "TLJlAwyK0_NG");
+     client.connect("********.cloudmqtt.com", "*************", "**********");
     // publish/subscribe
      if (client.isConnected()) {
        client.publish("CONNECTION_STATUS","Connected.");
