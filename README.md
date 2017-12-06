@@ -13,8 +13,8 @@ The weather shild base project was developed by N. Seidle of SparkFun.
 brownout protection by JVanier: https://community.particle.io/t/eeprom-persistence-issue/16514/39
 
 Authors:
-	- Sid Kasat, CS Junior @ UC Irvine
-	- Mindy Saylors, EE Junior @ UC Irvine
+	* Sid Kasat, CS Junior @ UC Irvine
+	* Mindy Saylors, EE Junior @ UC Irvine
 
 Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 California Institute for Telecommunications and Information Technology (Calit2), 2017
