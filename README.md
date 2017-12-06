@@ -9,7 +9,7 @@ Based on the example code from Haodong Liang who used ThingSpeak, but modified f
 used for CloudMQTT. Link to his project: https://www.hackster.io/hliang/thingspeak-weather-station-data-analysis-2877b0.
 The SI1145 driver was developed by Limor Fried of Adafruit:  https://learn.adafruit.com/adafruit-si1145-breakout-board-uv-ir-visible-sensor/
 The TCA9548a driver was developed by Limor Fried of Adafruit:  https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout/wiring-and-test?view=all with porting to Photon by Rickkas7: https://github.com/rickkas7/TCA9548A-RK  
-The weather shild base project was developed by N. Seidle of SparkFun.
+The Sparkfun Weather Shield base project was developed by N. Seidle of SparkFun.
 brownout protection by JVanier: https://community.particle.io/t/eeprom-persistence-issue/16514/39
 
 Authors:
