@@ -1,4 +1,3 @@
-
 //===========================================================================
 // Description:
 //	Photon weather station includes temperature, humidity, pressure, rain in inches,
@@ -161,7 +160,7 @@ void setBrowoutResetLevel() {
 
  MQTT client("m12.cloudmqtt.com", 14668, callback);
  void initializeCloudMQTT() {
-     client.connect("********.cloudmqtt.com", "*************", "**********");
+     client.connect("***SERVER******.cloudmqtt.com", "************USER*******", "******************PWD******");
     // publish/subscribe
      if (client.isConnected()) {
        client.publish("CONNECTION_STATUS","Connected.");
@@ -206,6 +205,9 @@ void setBrowoutResetLevel() {
 	
  	snprintf(payload, sizeof(payload), "%0.2f", windDegrees);
  	client.publish("Calit2_Weather_Station/WindDirection_DEG", payload);
+ 	
+ 	snprintf(payload, sizeof(payload), "%0.2f", rainInches);
+ 	client.publish("Calit2_Weather_Station/RainFall_INCHESperRepPeriod", payload);
 
 	snprintf(payload, sizeof(payload), "%0.2f", UV);
  	client.publish("Calit2_Weather_Station/LightUV_INDEX", payload);
