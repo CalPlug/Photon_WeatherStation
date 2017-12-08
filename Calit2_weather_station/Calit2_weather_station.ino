@@ -1,3 +1,4 @@
+
 //===========================================================================
 // Description:
 //	Photon weather station includes temperature, humidity, pressure, rain in inches,
@@ -160,7 +161,7 @@ void setBrowoutResetLevel() {
 
  MQTT client("m12.cloudmqtt.com", 14668, callback);
  void initializeCloudMQTT() {
-     client.connect("***SERVER******.cloudmqtt.com", "************USER*******", "******************PWD******");
+     client.connect("***Server***.cloudmqtt.com", "******USER*******", "******PASSWORD*******");
     // publish/subscribe
      if (client.isConnected()) {
        client.publish("CONNECTION_STATUS","Connected.");
@@ -225,6 +226,8 @@ void setBrowoutResetLevel() {
  	
  	snprintf(payload, sizeof(payload), "%0.2f", float(millis())/1000);
  	client.publish("Calit2_Weather_Station/RUNTIME_SEC", payload);
+
+ 	Particle.publish(String::format("MQTTPublish@ %d Seconds Runtime", (millis())/1000));
  }
 
 
@@ -632,6 +635,7 @@ void captureGeigerValues(){ //Captures values (uses a while loop which may disru
 		char payload[255];
 		snprintf(payload, sizeof(payload), "%0.2f", float(millis())/1000);
  	    client.publish("Calit2_Weather_Station/RUNTIME_SEC", payload);
+ 	    Particle.publish(String::format("MQTTPublish@ %d Seconds Runtime", (millis())/1000));
 		}
 		
 		dataIsNotCollected = false;
