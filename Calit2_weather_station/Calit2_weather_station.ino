@@ -53,17 +53,19 @@ const int AnemometerPin = D3;
 const int WindVanePin = A0;
 
 //Loop and timing control
-const unsigned int sensorCapturePeriod = 100; //0.1 second  // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
-const unsigned int publishPeriod = 10000; //10 seconds, 
+const unsigned int sensorCapturePeriod = 100; //(ms) 0.1 second  // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
+const unsigned int publishPeriod = 10000; //(ms) 10 seconds, 
 unsigned int timeNextPublish; // Each time we loop through the main loop, we check to see if it's time to publish the data we've collected, update this value
-unsigned int timeNextSensorReading = 100; //0.1 second
+unsigned int timeNextSensorReading = 100; //(ms) 0.1 second
 
 //Geiger Counter reading management
 unsigned int lastmillis = millis (); //used to manage reporting of Geiger Counter values
-const unsigned int geigerloopdelay = 2000; //period between independent reports from the geiger counter
-const unsigned int MINUTE = 60000; // 1 minute(s)  (a really longe delay is added here to improve battery life with the current solar charger)
+const unsigned int geigerloopdelay = 2000; //period (ms) between independent reports from the geiger counter
+const unsigned int geigerstart = 2; // start for geiger counter (min)
+const unsigned int geigerdelay = 10; // delay for geiger counter (min)
+
 unsigned int timeNextGeigerReading;  // Each time we loop through the main loop, we check to see if it's time to capture the geiger counter readings
-bool GEIGER_READING= false;
+bool GEIGER_READING= false; //start with the geiger counter set to off
 
 //Global values for functions
 //Temp and Humidity sensor + Pressure Sensor
@@ -214,12 +216,12 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("XXXXSERVERXXXX", 14668, callback);  //NOTE:  Object created after the callback is setup
+ MQTT client("XXXXSERVERXXXXX", 14668, callback);  //NOTE:  Object created after the callback is setup
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("XXXXXXSERVERXXXXX", "XXXXUSERXXXXXX", "XXXXXPWDXXXXX");
+     client.connect("XXXXXSERVERXXXXXX", "XXXXUSERXXXXX", "XXXXPWDXXXX");
     // publish/subscribe
      if (client.isConnected()) 
      {
@@ -279,7 +281,7 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
  	snprintf(payload, sizeof(payload), "%0.2f", IR);
  	client.publish("Weather_Station/LightIR_ADC", payload);
  	
- 	if (GEIGER_READING == false || millis()<119999) //When no data is supposed to be present, put in a placeholder.  Do not read in geiger value until the 2 min mark when readings are valid, mute by forcing placement of * placeholders during this period
+ 	if (GEIGER_READING == false || millis()<62999) //When no data is supposed to be present, put in a placeholder.  Do not read in geiger value until the ~2 min mark (100 seconds) when readings are valid, mute by forcing placement of * placeholders during this period
     	{
     	    client.publish("Weather_Station/GEIGER_OUTPUT", "*");
  	    }
@@ -381,7 +383,8 @@ void captureTempHumidityPressure()
 
 float getAndResetTempF()
 {
-    if(tempFReadingCount == 0) {
+    if(tempFReadingCount == 0) 
+    {
         return 0;
     }
     float result = tempFTotal/float(tempFReadingCount);
@@ -393,7 +396,8 @@ float getAndResetTempF()
 
 float getAndResetTempC()
 {
-    if(tempCReadingCount == 0) {
+    if(tempCReadingCount == 0) 
+    {
         return 0;
     }
     float result = tempCTotal/float(tempCReadingCount);
@@ -405,7 +409,8 @@ float getAndResetTempC()
 
 float getAndResetHumidityRH()
 {
-    if(humidityRHReadingCount == 0) {
+    if(humidityRHReadingCount == 0) 
+    {
         return 0;
     }
     float result = humidityRHTotal/float(humidityRHReadingCount);
@@ -756,9 +761,7 @@ bool initializeUV()
     #define SI1145_PARAM_ADCMUX_SMALLIR  0x00
     #define SI1145_PARAM_ADCMUX_LARGEIR  0x03
     
-    
-    
-    /* REGISTERS */
+        /* REGISTERS */
     #define SI1145_REG_PARTID  0x00
     #define SI1145_REG_REVID  0x01
     #define SI1145_REG_SEQID  0x02
@@ -1049,15 +1052,15 @@ void loop()
 
 	if(timeNextGeigerReading <= millis())
 	{ // turn on geiger counter
+	    GEIGER_READING=true;
 		digitalWrite(GeigerPowerPin, LOW); //enable geige counter
-		GEIGER_READING=true;
-		if(timeNextGeigerReading+MINUTE <= millis())
+		if(timeNextGeigerReading+60000 <= millis()) //60000 is used as this is how many milliseconds in 1 minute
 		{ // start taking data after a minute
 			captureGeigerValues();
 			GEIGER_READING=true;
-			if(timeNextGeigerReading + 2*MINUTE <= millis())
+			if(timeNextGeigerReading + (geigerstart*60000) <= millis())
 			{
-				timeNextGeigerReading = 10*MINUTE+millis();
+				timeNextGeigerReading = (geigerdelay*60000) + millis();
 				digitalWrite(GeigerPowerPin, HIGH);  //disable geige counter, end reading session
 				GEIGER_READING=false;  //disable geige counter, end reading session
 			}
@@ -1093,7 +1096,7 @@ void loop()
          else
              {   
               Particle.publish(String::format("Client Publish Fail: Now %f Min. Runtime", (millis())/60000)); //notify of connection failure to MQTT Broker (provided general connectivity)
-              client.connect("XXXSERVERXXXXX", "XXXUSERXXXX", "XXXXPWDXXXX"); //Try to reconnect for next round
+              client.connect("XXXXXSERVERXXXXX", "XXXUSERXXXX", "XXXXPWDXXXXXX"); //Try to reconnect for next round
              }
          
         
@@ -1107,5 +1110,6 @@ void loop()
         }
 
 // The rain and wind speed sensors use interrupts, and so data is collected "in the background"
-    delay(2); //delay to slow down loop speed
+
+    delay(2); //delay to slow down loop speed to prevent free run in debug testing
 }
