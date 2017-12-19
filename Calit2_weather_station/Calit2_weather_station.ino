@@ -41,31 +41,29 @@
 
 TCA9548A mux(Wire, 0); //Initiaalize the I2C Multiplexer with default settings
 
-	
-//Interface Ports & Pins
-int GeigerPowerPin = D7; //this is the source for the enable pin (required as inverted) used to turn on the power regulator to supply the geiger counter with power
-int RainPin = D2;
-int AnemometerPin = D3;
-
-//Loop and timing control
-unsigned int sensorCapturePeriod = 100; //0.1 second  // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
-unsigned int timeNextSensorReading = 100; //0.1 second
-unsigned int lastmillis = millis (); //used to manage reporting of Geiger Counter values
-unsigned int geigerloopdelay = 5000; //0.1 second
-
-
-// Each time we loop through the main loop, we check to see if it's time to capture the geiger counter readings
-unsigned int timeNextGeigerReading;
-const unsigned int MINUTE = 60000; // 1 minute(s)  (a really longe delay is added here to improve battery life with the current solar charger)
-
-// Each time we loop through the main loop, we check to see if it's time to publish the data we've collected
-unsigned int publishPeriod = 10000; //10 seconds
-unsigned int timeNextPublish; 
-bool GEIGER_READING= false;
-
 Weather sensor; //Create Instance of HTU21D or SI7021 temp and humidity sensor and MPL3115A2 barometric sensor
 Adafruit_SI1145 uv = Adafruit_SI1145(); //create object for UV, there is a test at this point but the I2C is not set yet
 void callback(char* topic, byte* payload, unsigned int length); //Function Prototype for MQTT callback for subscribe functionality
+
+	
+//Interface Ports & Pins
+const int GeigerPowerPin = D7; //this is the source for the enable pin (required as inverted) used to turn on the power regulator to supply the geiger counter with power
+const int RainPin = D2;
+const int AnemometerPin = D3;
+const int WindVanePin = A0;
+
+//Loop and timing control
+const unsigned int sensorCapturePeriod = 100; //0.1 second  // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
+const unsigned int publishPeriod = 10000; //10 seconds, 
+unsigned int timeNextPublish; // Each time we loop through the main loop, we check to see if it's time to publish the data we've collected, update this value
+unsigned int timeNextSensorReading = 100; //0.1 second
+
+//Geiger Counter reading management
+unsigned int lastmillis = millis (); //used to manage reporting of Geiger Counter values
+const unsigned int geigerloopdelay = 2000; //period between independent reports from the geiger counter
+const unsigned int MINUTE = 60000; // 1 minute(s)  (a really longe delay is added here to improve battery life with the current solar charger)
+unsigned int timeNextGeigerReading;  // Each time we loop through the main loop, we check to see if it's time to capture the geiger counter readings
+bool GEIGER_READING= false;
 
 //Global values for functions
 //Temp and Humidity sensor + Pressure Sensor
@@ -85,7 +83,7 @@ unsigned int pressurePascalsReadingCount = 0;
 //Rain Sensor
 volatile unsigned int rainEventCount;
 unsigned int lastRainEvent;
-float RainScaleInches = 0.011; // Each pulse is .011 inches of rain
+const float RainScaleInches = 0.011; // Each pulse is .011 inches of rain
 
 //Windspeed Sensor
 float AnemometerScaleMPH = 1.492; // Windspeed if we got a pulse every second (i.e. 1Hz)
@@ -95,11 +93,9 @@ volatile unsigned int GustPeriod = UINT_MAX;
 unsigned int lastAnemoneterEvent = 0;
 
 //Wind Direction Indicator
-int WindVanePin = A0;
 float windVaneCosTotal = 0.0;  // For the wind vane, we need to average the unit vector components (the sine and cosine of the angle)
 float windVaneSinTotal = 0.0;  // For the wind vane, we need to average the unit vector components (the sine and cosine of the angle)
 unsigned int windVaneReadingCount = 0;
-
 
 //Values for Light/UV/IR Sensor
 float lightVisTotal = 0.0;
@@ -117,7 +113,7 @@ void setup()
 {
   Serial.begin(9600); //required for reporting over USB
     //Brownout protection for solar input
-  delay(2000);
+  delay(1000);
   printBrownOutResetLevel();
   setBrowoutResetLevel();
   printBrownOutResetLevel();
@@ -139,7 +135,7 @@ void setup()
     timeNextSensorReading = millis() + sensorCapturePeriod;
     timeNextPublish = millis() + publishPeriod; 
 	timeNextGeigerReading = millis() + sensorCapturePeriod; //start reading shortly after initlization
-	delay(3000); //added to get geiger counter timer ready so first character set can come across
+	delay(1000); //added to get geiger counter timer ready so first character set can come across
 }
 
 
@@ -218,79 +214,78 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("m12.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
+ MQTT client("XXXXSERVERXXXX", 14668, callback);  //NOTE:  Object created after the callback is setup
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("XXXXXXXX", "XXXXXXXXXX", "XXXXXXXXXX");
+     client.connect("XXXXXXSERVERXXXXX", "XXXXUSERXXXXXX", "XXXXXPWDXXXXX");
     // publish/subscribe
      if (client.isConnected()) 
      {
-       client.publish("Calit2_Weather_Station/CONNECTION_STATUS","Connected.");
+       client.publish("Weather_Station/CONNECTION_STATUS","Connected"); //Send on connection point to MQTT
+       Particle.publish(String::format("MQTT Connection Established! (Publish@ %f Min. Runtime)", (millis())/60000));
      }
  }
 
 
  void publishToMQTT(float tempF,float tempC,float humidityRH,float pressureKPa,float rainInches,float windMPH,float windDegrees, float UV, float vis, float IR) //make sure to do anclient connected check before calling!
  {
-    // To write multiple fields, you set the various fields you want to send
+    // To write multiple fields for MQTT Posting
  	char payload[255];
- 	
  	//Derivative Calculations for partial pressure and dewpoint from final values to be reported
         float dewpointC = dewpoint(tempC,humidityRH);
         float dewpointF = (dewpointC * 1.8) + 32;
-        
         float partialpressureH2O = vaporpressureH2O(dewpointC);
-        //float partialpressureH2Osat = vaporpressureH2Osat(tempC);
-        //float rh_calc= (partialpressureH2O/partialpressureH2Osat)*100;  //calculate RH from e and es
+        //float partialpressureH2Osat = vaporpressureH2Osat(tempC);  //extra function that is redundant 
+        //float rh_calc= (partialpressureH2O/partialpressureH2Osat)*100;  //calculate RH from e and es, extra function that is redundant 
 
  	snprintf(payload, sizeof(payload), "%0.2f", tempF);
- 	client.publish("Calit2_Weather_Station/Temperature_F", payload);
+ 	client.publish("Weather_Station/Temperature_F", payload);
 	
  	snprintf(payload, sizeof(payload), "%0.2f", tempC);
- 	client.publish("Calit2_Weather_Station/Temperature_C", payload);
+ 	client.publish("Weather_Station/Temperature_C", payload);
 	
  	snprintf(payload, sizeof(payload), "%0.2f", humidityRH);
- 	client.publish("Calit2_Weather_Station/Humidity_RH", payload);
+ 	client.publish("Weather_Station/Humidity_RH", payload);
 	
  	snprintf(payload, sizeof(payload), "%0.2f", pressureKPa);
- 	client.publish("Calit2_Weather_Station/Pressure_ KPa", payload);
+ 	client.publish("Weather_Station/Pressure_ KPa", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", dewpointC);
- 	client.publish("Calit2_Weather_Station/DewPoint_C", payload);
+ 	client.publish("Weather_Station/DewPoint_C", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", dewpointF);
- 	client.publish("Calit2_Weather_Station/DewPoint_F", payload);
+ 	client.publish("Weather_Station/DewPoint_F", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", partialpressureH2O);
- 	client.publish("Calit2_Weather_Station/H2OPartialPressure_ KPa", payload);
+ 	client.publish("Weather_Station/H2OPartialPressure_ KPa", payload);
 
  	snprintf(payload, sizeof(payload), "%0.2f", windMPH);
- 	client.publish("Calit2_Weather_Station/WindSpeed_MPH", payload);
+ 	client.publish("Weather_Station/WindSpeed_MPH", payload);
 	
  	snprintf(payload, sizeof(payload), "%0.2f", windDegrees);
- 	client.publish("Calit2_Weather_Station/WindDirection_DEG", payload);
+ 	client.publish("Weather_Station/WindDirection_DEG", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", rainInches);
- 	client.publish("Calit2_Weather_Station/RainFall_INCHES_PerRepPeriod", payload);
+ 	client.publish("Weather_Station/RainFall_INCHES_PerRepPeriod", payload);
 
 	snprintf(payload, sizeof(payload), "%0.2f", UV);
- 	client.publish("Calit2_Weather_Station/LightUV_INDEX", payload);
+ 	client.publish("Weather_Station/LightUV_INDEX", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", vis);
- 	client.publish("Calit2_Weather_Station/LightVIS_ADC", payload);
+ 	client.publish("Weather_Station/LightVIS_ADC", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", IR);
- 	client.publish("Calit2_Weather_Station/LightIR_ADC", payload);
+ 	client.publish("Weather_Station/LightIR_ADC", payload);
  	
- 	if (GEIGER_READING == false || millis()<=60000) //Solves blank issue for first minute
+ 	if (GEIGER_READING == false || millis()<119999) //When no data is supposed to be present, put in a placeholder.  Do not read in geiger value until the 2 min mark when readings are valid, mute by forcing placement of * placeholders during this period
     	{
-    	    client.publish("Calit2_Weather_Station/GEIGER_OUTPUT", "*");
+    	    client.publish("Weather_Station/GEIGER_OUTPUT", "*");
  	    }
  	
  	snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
- 	client.publish("Calit2_Weather_Station/RUNTIME_MIN", payload);
+ 	client.publish("Weather_Station/RUNTIME_MIN", payload);
  	Particle.publish(String::format("MQTTPublish@ %f Min. Runtime", (millis())/60000));
  }
 
@@ -422,7 +417,8 @@ float getAndResetHumidityRH()
 
 float getAndResetPressurePascals()
 {
-    if(pressurePascalsReadingCount == 0) {
+    if(pressurePascalsReadingCount == 0) 
+    {
         return 0;
     }
     float result = pressurePascalsTotal/float(pressurePascalsReadingCount);
@@ -652,7 +648,6 @@ void initializeGeigerCounter()
 void captureGeigerValues()
 { //Captures values (caution: uses a while loop which may disrupt timing)
  bool dataIsNotCollected = true;		// to collect data for one line of data
-
 	do
 	{
 	    //bool newdata=false;
@@ -671,14 +666,14 @@ void captureGeigerValues()
 		    test[i]=c;
 	        i++;
 		}
-        	if (i>26 && (test[0]=='C' || test[0]=='*')) //check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+        	if (i>30 && (test[0]=='C' || test[0]=='*')) //check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
         	{
         	    if (client.isConnected() && (lastmillis + geigerloopdelay < millis())) //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
                     {
-           		        client.publish("Calit2_Weather_Station/GEIGER_OUTPUT",test);
+           		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
         	            char payload[255];
         	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
-                         client.publish("Calit2_Weather_Station/RUNTIME_MIN", payload);
+                         client.publish("Weather_Station/RUNTIME_MIN", payload);
                          Particle.publish(String::format("MQTTPublish@ %f MIN Runtime", (millis())/60000));
                          lastmillis = millis (); //set new value for lastmillis, this is used to meter the rate of the loop
                     }
@@ -1093,12 +1088,12 @@ void loop()
         if (client.isConnected())
             {
     		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex,vis,IR);
-    		Serial.println("Just Published to MQTT");
+    		//Serial.println("Just Published to MQTT");  //Serial DEBUG message
             }
          else
              {   
               Particle.publish(String::format("Client Publish Fail: Now %f Min. Runtime", (millis())/60000)); //notify of connection failure to MQTT Broker (provided general connectivity)
-              client.connect("XXX.cloudmqtt.com", "XXXXXXXX", "XXXXXX"); //Try to reconnect for next round
+              client.connect("XXXSERVERXXXXX", "XXXUSERXXXX", "XXXXPWDXXXX"); //Try to reconnect for next round
              }
          
         
