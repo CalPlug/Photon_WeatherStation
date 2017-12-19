@@ -1,4 +1,4 @@
-
+  
 //===========================================================================
 // Description:
 //	Photon weather station includes temperature, humidity, pressure, rain in inches,
@@ -42,9 +42,16 @@
 TCA9548A mux(Wire, 0); //Initiaalize the I2C Multiplexer with default settings
 
 	
-// Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
-unsigned int sensorCapturePeriod = 100; //0.1 second
-unsigned int timeNextSensorReading;
+//Interface Ports & Pins
+int GeigerPowerPin = D7; //this is the source for the enable pin (required as inverted) used to turn on the power regulator to supply the geiger counter with power
+int RainPin = D2;
+int AnemometerPin = D3;
+
+//Loop and timing control
+unsigned int sensorCapturePeriod = 100; //0.1 second  // Each time we loop through the main loop, we check to see if it's time to capture the I2C sensor readings
+unsigned int timeNextSensorReading = 100; //0.1 second
+unsigned int lastmillis = millis (); //used to manage reporting of Geiger Counter values
+unsigned int geigerloopdelay = 5000; //0.1 second
 
 
 // Each time we loop through the main loop, we check to see if it's time to capture the geiger counter readings
@@ -52,19 +59,63 @@ unsigned int timeNextGeigerReading;
 const unsigned int MINUTE = 60000; // 1 minute(s)  (a really longe delay is added here to improve battery life with the current solar charger)
 
 // Each time we loop through the main loop, we check to see if it's time to publish the data we've collected
-unsigned int publishPeriod = 10000; //10 second
+unsigned int publishPeriod = 10000; //10 seconds
 unsigned int timeNextPublish; 
-
 bool GEIGER_READING= false;
 
-//Create Instance of HTU21D or SI7021 temp and humidity sensor and MPL3115A2 barometric sensor
-Weather sensor;
-
+Weather sensor; //Create Instance of HTU21D or SI7021 temp and humidity sensor and MPL3115A2 barometric sensor
 Adafruit_SI1145 uv = Adafruit_SI1145(); //create object for UV, there is a test at this point but the I2C is not set yet
+void callback(char* topic, byte* payload, unsigned int length); //Function Prototype for MQTT callback for subscribe functionality
+
+//Global values for functions
+//Temp and Humidity sensor + Pressure Sensor
+float humidityRHTotal = 0.0;
+unsigned int humidityRHReadingCount = 0;
+float tempFTotal = 0.0;
+unsigned int tempFReadingCount = 0;
+float tempCTotal = 0.0;
+unsigned int tempCReadingCount = 0;
+float pressurePascalsTotal = 0.0;
+float partialpressureH2O = 0.0;
+float partialpressureH2Osat = 0.0;
+float dewpointC = 0.0;
+float dewpointF = 0.0;
+unsigned int pressurePascalsReadingCount = 0;
+
+//Rain Sensor
+volatile unsigned int rainEventCount;
+unsigned int lastRainEvent;
+float RainScaleInches = 0.011; // Each pulse is .011 inches of rain
+
+//Windspeed Sensor
+float AnemometerScaleMPH = 1.492; // Windspeed if we got a pulse every second (i.e. 1Hz)
+volatile unsigned int AnemoneterPeriodTotal = 0;
+volatile unsigned int AnemoneterPeriodReadingCount = 0;
+volatile unsigned int GustPeriod = UINT_MAX;
+unsigned int lastAnemoneterEvent = 0;
+
+//Wind Direction Indicator
+int WindVanePin = A0;
+float windVaneCosTotal = 0.0;  // For the wind vane, we need to average the unit vector components (the sine and cosine of the angle)
+float windVaneSinTotal = 0.0;  // For the wind vane, we need to average the unit vector components (the sine and cosine of the angle)
+unsigned int windVaneReadingCount = 0;
 
 
-void setup() {
-    Serial.begin(9600); //required for reporting over USB
+//Values for Light/UV/IR Sensor
+float lightVisTotal = 0.0;
+unsigned int lightVisReadingCount = 0;
+
+float lightUVTotal = 0.0;
+unsigned int lightUVReadingCount = 0;
+
+float lightIRTotal = 0.0;
+unsigned int lightIRReadingCount = 0;
+
+
+//*************************Functions*******************************
+void setup() 
+{
+  Serial.begin(9600); //required for reporting over USB
     //Brownout protection for solar input
   delay(2000);
   printBrownOutResetLevel();
@@ -83,20 +134,24 @@ void setup() {
     	 delay (50);
     	 initializeUV(); //contains a replacement of uv.begin() without the check for 0x45 on device 0x00 which causes issues with the other sensors.
     mux.setChannel(1);  //Return to Main I2C bus selection
+    
     // Schedule the next sensor reading and publish events
     timeNextSensorReading = millis() + sensorCapturePeriod;
     timeNextPublish = millis() + publishPeriod; 
 	timeNextGeigerReading = millis() + sensorCapturePeriod; //start reading shortly after initlization
+	delay(3000); //added to get geiger counter timer ready so first character set can come across
 }
 
-void printBrownOutResetLevel() {
+
+void printBrownOutResetLevel() //Used to protect code operation if voltage drops too low because of limited solar
+{
   Serial.println("Reading BOR");
 
   uint8_t bor = FLASH_OB_GetBOR();
 
   switch(bor) {
     case OB_BOR_OFF:
-      Serial.println("OB_BOR_OFF: Supply voltage ranges from 1.62 to 2.10 V");
+      Serial.println("OB_BOR_OFF: Supply voltage ranges from 1.62 to 2.10 V");  //Debug report to serial
       break;
     case OB_BOR_LEVEL1:
       Serial.println("OB_BOR_LEVEL1: Supply voltage ranges from 2.10 to 2.40 V");
@@ -111,7 +166,9 @@ void printBrownOutResetLevel() {
   Serial.println("");
 }
 
-void setBrowoutResetLevel() {
+
+void setBrowoutResetLevel()  //Used to protect code operation if voltage drops too low because of limited solar
+{
   const uint8_t desiredBOR = OB_BOR_LEVEL3;
   if(FLASH_OB_GetBOR() != desiredBOR) {
     Serial.println("Writing BOR");
@@ -141,34 +198,42 @@ void setBrowoutResetLevel() {
   Serial.println("");
 }
 
+
 //===========================================================
 // MQTT Client
 //===========================================================
- void callback(char* topic, byte* payload, unsigned int length); // dont need prototype currently ***
- void callback(char* topic, byte* payload, unsigned int length) {
+ void callback(char* topic, byte* payload, unsigned int length) // dont need current function -- used for subscribe, this is from the example, but can be adapted later
+ {
      char p[length + 1];
      memcpy(p, payload, length);
      p[length] = NULL;
-     if (!strcmp(p, "RED"))
-         RGB.color(255, 0, 0);
-     else if (!strcmp(p, "GREEN"))
-         RGB.color(0, 255, 0);
-     else if (!strcmp(p, "BLUE"))
-         RGB.color(0, 0, 255);
+     if (!strcmp(p, "VAL1"))
+         Serial.println("VAL 1 RCVD from MQTT Subscribe Read");
+     else if (!strcmp(p, "VAL2"))
+         Serial.println("VAL 2 RCVD from MQTT Subscribe Read");
+     else if (!strcmp(p, "VAL3"))
+         Serial.println("VAL 3 RCVD from MQTT Subscribe Read");
      else
-         RGB.color(255, 255, 255);
+     {
+         //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
+     }
  }
-
- MQTT client("m12.cloudmqtt.com", 14668, callback);
- void initializeCloudMQTT() {
-     client.connect("***Server***.cloudmqtt.com", "******USER*******", "******PASSWORD*******");
+ MQTT client("m12.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
+ 
+ 
+ void initializeCloudMQTT() 
+ {
+     client.connect("XXXXXXXX", "XXXXXXXXXX", "XXXXXXXXXX");
     // publish/subscribe
-     if (client.isConnected()) {
-       client.publish("CONNECTION_STATUS","Connected.");
+     if (client.isConnected()) 
+     {
+       client.publish("Calit2_Weather_Station/CONNECTION_STATUS","Connected.");
      }
  }
 
- void publishToMQTT(float tempF,float tempC,float humidityRH,float pressureKPa,float rainInches,float windMPH,float windDegrees, float UV, float vis, float IR) {
+
+ void publishToMQTT(float tempF,float tempC,float humidityRH,float pressureKPa,float rainInches,float windMPH,float windDegrees, float UV, float vis, float IR) //make sure to do anclient connected check before calling!
+ {
     // To write multiple fields, you set the various fields you want to send
  	char payload[255];
  	
@@ -208,7 +273,7 @@ void setBrowoutResetLevel() {
  	client.publish("Calit2_Weather_Station/WindDirection_DEG", payload);
  	
  	snprintf(payload, sizeof(payload), "%0.2f", rainInches);
- 	client.publish("Calit2_Weather_Station/RainFall_INCHESperRepPeriod", payload);
+ 	client.publish("Calit2_Weather_Station/RainFall_INCHES_PerRepPeriod", payload);
 
 	snprintf(payload, sizeof(payload), "%0.2f", UV);
  	client.publish("Calit2_Weather_Station/LightUV_INDEX", payload);
@@ -220,14 +285,13 @@ void setBrowoutResetLevel() {
  	client.publish("Calit2_Weather_Station/LightIR_ADC", payload);
  	
  	if (GEIGER_READING == false || millis()<=60000) //Solves blank issue for first minute
- 	{
- 	client.publish("Calit2_Weather_Station/GEIGER_OUTPUT", "*");
- 	}
+    	{
+    	    client.publish("Calit2_Weather_Station/GEIGER_OUTPUT", "*");
+ 	    }
  	
- 	snprintf(payload, sizeof(payload), "%0.2f", float(millis())/1000);
- 	client.publish("Calit2_Weather_Station/RUNTIME_SEC", payload);
-
- 	Particle.publish(String::format("MQTTPublish@ %d Seconds Runtime", (millis())/1000));
+ 	snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
+ 	client.publish("Calit2_Weather_Station/RUNTIME_MIN", payload);
+ 	Particle.publish(String::format("MQTTPublish@ %f Min. Runtime", (millis())/60000));
  }
 
 
@@ -237,15 +301,9 @@ void setBrowoutResetLevel() {
 // The temperature, humidity, and pressure sensors are on board
 // the weather station board, and use I2C to communicate.  The sensors are read
 // frequently by the main loop, and the results are averaged over the publish cycle
-
-
-void initializeTempHumidityAndPressure() {
-    //Initialize the I2C sensors and ping them
-    
-    //Initialize Sensors on Weather Shield for Pressure and Temp/Humidity
-    sensor.begin();
-    
-    ///*
+void initializeTempHumidityAndPressure() 
+{
+        sensor.begin();  //Initialize Sensors on Weather Shield for Pressure and Temp/Humidity, Initialize the I2C sensors and ping them
     //Explicit Check of HTU21D (part of sensor.begin()), this may be helpful fpr this sensor only - still looking into it
         #define HTU21D_ADDRESS 0x40
 	    uint8_t ID_1;
@@ -256,39 +314,24 @@ void initializeTempHumidityAndPressure() {
 	    Wire.endTransmission();
         Wire.requestFrom(HTU21D_ADDRESS,1);
         ID_1 = Wire.read();
-        Particle.publish("HTU21D Temp/RH Sensor: ", String::format("%d",ID_1)); //Report value to Particle Console
-    //*/
+        Particle.publish("HTU21D Temp/RH Sensor Type: ", String::format("%d",ID_1)); //Report sensor type value to Particle Console
+    //
     
     //Set to Barometer Mode
     sensor.setModeBarometer();
-    
     // Set Oversample rate
     sensor.setOversampleRate(7);
-
     //Necessary register calls to enble temp, baro and alt
     sensor.enableEventFlags(); 
 }
 
-float humidityRHTotal = 0.0;
-unsigned int humidityRHReadingCount = 0;
-float tempFTotal = 0.0;
-unsigned int tempFReadingCount = 0;
-float tempCTotal = 0.0;
-unsigned int tempCReadingCount = 0;
-float pressurePascalsTotal = 0.0;
-float partialpressureH2O = 0.0;
-float partialpressureH2Osat = 0.0;
-float dewpointC = 0.0;
-float dewpointF = 0.0;
-unsigned int pressurePascalsReadingCount = 0;
 
-void captureTempHumidityPressure() {
+void captureTempHumidityPressure() 
+{
   // Read the humidity and pressure sensors, and update the running average
   // The running (mean) average is maintained by keeping a running sum of the observations,
   // and a count of the number of observations
-  
-
-  // Measure Temperature in F from the HTU21D or Si7021
+    // Measure Temperature in F from the HTU21D or Si7021
   float tempF = sensor.getTempF();
   
   //If the result is reasonable, add it to the running mean
@@ -299,15 +342,16 @@ void captureTempHumidityPressure() {
       tempFReadingCount++;
   }
   
-    // Measure Relative Humidity from the HTU21D or Si7021
- float humidityRH = sensor.getRH();
-    
-    float gain=1.4;    //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
-    float offset = 22;  //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
-    humidityRH = humidityRH*gain + offset;
   
+ // Measure Relative Humidity from the HTU21D or Si7021
+ float humidityRH = sensor.getRH();
+    // Linear Correction for humidity sensor (to fix calibration issue)
+    float gain=1.4;    //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
+    float offset = 35;  //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
+    humidityRH = humidityRH*gain + offset;
+    //
   //If the result is reasonable, add it to the running mean
-  if(humidityRH > 0 && humidityRH < 105)   //the lower bound should be 0, but something funny is going on....
+  if(humidityRH > 0 && humidityRH < 105)   //the lower bound should be 0, but something funny is going on, so linear correction done before this step....
   {
       // Add the observation to the running sum, and increment the number of observations
       humidityRHTotal += humidityRH;
@@ -339,6 +383,7 @@ void captureTempHumidityPressure() {
   return;
 }
 
+
 float getAndResetTempF()
 {
     if(tempFReadingCount == 0) {
@@ -349,6 +394,7 @@ float getAndResetTempF()
     tempFReadingCount = 0;
     return result;
 }
+
 
 float getAndResetTempC()
 {
@@ -361,6 +407,7 @@ float getAndResetTempC()
     return result;
 }
 
+
 float getAndResetHumidityRH()
 {
     if(humidityRHReadingCount == 0) {
@@ -371,6 +418,7 @@ float getAndResetHumidityRH()
     humidityRHReadingCount = 0;
     return result;
 }
+
 
 float getAndResetPressurePascals()
 {
@@ -383,17 +431,20 @@ float getAndResetPressurePascals()
     return result;
 }
 
+
 float dewpoint(float TempC, float RH)
 {
     float dp= 243.04*(log(RH/100)+((17.625*TempC)/(243.04+TempC)))/(17.625-log(RH/100)-((17.625*TempC)/(243.04+TempC)));
     return dp;
 }
 
+
 float vaporpressureH2O( float dpC)
 {
     float e= 6.11*pow(10,((7.5*dpC)/(237.3 + dpC)));  //actual vapor pressure  (10^x)
     return e*10;  //convert hPa to KPa to report
 }
+
 
 float vaporpressureH2Osat(float TempC)
 {
@@ -402,24 +453,21 @@ float vaporpressureH2Osat(float TempC)
 }
 
 
-
 //===========================================================================
 // Rain Guage
 //===========================================================================
-int RainPin = D2;
-volatile unsigned int rainEventCount;
-unsigned int lastRainEvent;
-float RainScaleInches = 0.011; // Each pulse is .011 inches of rain
-
-void initializeRainGauge() {
+void initializeRainGauge() 
+{
   //pinMode(RainPin, INPUT_PULLUP);
   rainEventCount = 0;
   lastRainEvent = 0;
   //attachInterrupt(RainPin, handleRainEvent, FALLING);
   return;
-  }
+}
+ 
   
-void handleRainEvent() {
+void handleRainEvent() 
+{
     // Count rain gauge bucket tips as they occur
     // Activated by the magnet and reed switch in the rain gauge, attached to input D2
     unsigned int timeRainEvent = millis(); // grab current time
@@ -431,6 +479,7 @@ void handleRainEvent() {
     rainEventCount++; //Increase this minute's amount of rain
     lastRainEvent = timeRainEvent; // set up for next event
 }
+
 
 float getAndResetRainInches()
 {
@@ -446,15 +495,8 @@ float getAndResetRainInches()
 
 // The Anemometer generates a frequency relative to the windspeed.  1Hz: 1.492MPH, 2Hz: 2.984MPH, etc.
 // We measure the average period (elaspsed time between pulses), and calculate the average windspeed since the last recording.
-
-int AnemometerPin = D3;
-float AnemometerScaleMPH = 1.492; // Windspeed if we got a pulse every second (i.e. 1Hz)
-volatile unsigned int AnemoneterPeriodTotal = 0;
-volatile unsigned int AnemoneterPeriodReadingCount = 0;
-volatile unsigned int GustPeriod = UINT_MAX;
-unsigned int lastAnemoneterEvent = 0;
-
-void initializeAnemometer() {
+void initializeAnemometer() 
+{
   pinMode(AnemometerPin, INPUT_PULLUP);
   AnemoneterPeriodTotal = 0;
   AnemoneterPeriodReadingCount = 0;
@@ -464,12 +506,15 @@ void initializeAnemometer() {
   return;
   }
   
-void handleAnemometerEvent() {
+  
+void handleAnemometerEvent() 
+{
     // Activated by the magnet in the anemometer (2 ticks per rotation), attached to input D3
      unsigned int timeAnemometerEvent = millis(); // grab current time
      
     //If there's never been an event before (first time through), then just capture it
-    if(lastAnemoneterEvent != 0) {
+    if(lastAnemoneterEvent != 0) 
+    {
         // Calculate time since last event
         unsigned int period = timeAnemometerEvent - lastAnemoneterEvent;
         // ignore switch-bounce glitches less than 10mS after initial edge (which implies a max windspeed of 149mph)
@@ -486,6 +531,7 @@ void handleAnemometerEvent() {
     
     lastAnemoneterEvent = timeAnemometerEvent; // set up for next event
 }
+
 
 float getAndResetAnemometerMPH(float * gustMPH)
 {
@@ -509,17 +555,14 @@ float getAndResetAnemometerMPH(float * gustMPH)
 //===========================================================
 // Wind Vane
 //===========================================================
-void initializeWindVane() {
+void initializeWindVane() 
+{
     return;
 }
 
-// For the wind vane, we need to average the unit vector components (the sine and cosine of the angle)
-int WindVanePin = A0;
-float windVaneCosTotal = 0.0;
-float windVaneSinTotal = 0.0;
-unsigned int windVaneReadingCount = 0;
 
-void captureWindVane() {
+void captureWindVane()
+{
     // Read the wind vane, and update the running average of the two components of the vector
     unsigned int windVaneRaw = analogRead(WindVanePin);
     
@@ -533,9 +576,11 @@ void captureWindVane() {
     return;
 }
 
+
 float getAndResetWindVaneDegrees()
 {
-    if(windVaneReadingCount == 0) {
+    if(windVaneReadingCount == 0) 
+    {
         return 0;
     }
     float avgCos = windVaneCosTotal/float(windVaneReadingCount);
@@ -551,6 +596,7 @@ float getAndResetWindVaneDegrees()
     
    return result;
 }
+
 
 float lookupRadiansFromRaw(unsigned int analogRaw)
 {
@@ -586,7 +632,7 @@ float lookupRadiansFromRaw(unsigned int analogRaw)
 //	Geiger Values are submitted to through TX RX via the Serial1 USART connection
 //	FORMAT of CSV: CPS, ####, CPM, ####, uSv/hr, ##.##, SLOW/FAST/INST
 //
-//	Be sure to use only if Serial1.available() is true
+//	Be sure to read only if Serial1.available() is true
 //
 // Fix:
 //	Need to have mode_speed to remain constant for reading to be sure averaging
@@ -594,10 +640,8 @@ float lookupRadiansFromRaw(unsigned int analogRaw)
 //
 //	Need to get captureGeigerValues() to keep taking in values until <I say it needs to>
 //When no value is vailable, only * is returned
-
-int GeigerPowerPin = D7; //this is the source for the enable pin (required as inverted) used to turn on the power regulator to supply the geiger counter with power
-
-void initializeGeigerCounter(){
+void initializeGeigerCounter()
+{
 	Serial1.begin(9600);    	//Baud rate: 9600
 	pinMode(GeigerPowerPin, OUTPUT);
 	digitalWrite(GeigerPowerPin, HIGH); //turn off geiger counter read with HIGH (ivnverse enable on the controller)
@@ -605,171 +649,171 @@ void initializeGeigerCounter(){
 }
 
 
-// Values for get and reset function
-float cpsval=0;			
-float cpmval=0;
-float usvHRval =0; 
-String mode_speedval="";
+void captureGeigerValues()
+{ //Captures values (caution: uses a while loop which may disrupt timing)
+ bool dataIsNotCollected = true;		// to collect data for one line of data
 
-void captureGeigerValues(){ //Captures values (uses a while loop which may disrupt timing)
-	bool dataIsNotCollected = true;		// to collect data for one line of data
-
-	do{
+	do
+	{
+	    //bool newdata=false;
 		int arrlen=50;
 		char test[arrlen];
 		test[0]='*';
-		for (int i=1;i<arrlen;i++){
+		for (int i=1;i<arrlen;i++)
+		{
 		    test[i]='\0';
 		}
 
 		int i=0;
-	    while (i<arrlen and Serial1.available()){
+	    while (i<arrlen && Serial1.available())
+	    {
 	        char c= Serial1.read();
 		    test[i]=c;
 	        i++;
-	        
 		}
-		
-		if (test[0]=='C' or test[0]=='*'){
-		client.publish("Calit2_Weather_Station/GEIGER_OUTPUT",test);
-		char payload[255];
-		snprintf(payload, sizeof(payload), "%0.2f", float(millis())/1000);
- 	    client.publish("Calit2_Weather_Station/RUNTIME_SEC", payload);
- 	    Particle.publish(String::format("MQTTPublish@ %d Seconds Runtime", (millis())/1000));
-		}
-		
+        	if (i>26 && (test[0]=='C' || test[0]=='*')) //check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+        	{
+        	    if (client.isConnected() && (lastmillis + geigerloopdelay < millis())) //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
+                    {
+           		        client.publish("Calit2_Weather_Station/GEIGER_OUTPUT",test);
+        	            char payload[255];
+        	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
+                         client.publish("Calit2_Weather_Station/RUNTIME_MIN", payload);
+                         Particle.publish(String::format("MQTTPublish@ %f MIN Runtime", (millis())/60000));
+                         lastmillis = millis (); //set new value for lastmillis, this is used to meter the rate of the loop
+                    }
+        	}
 		dataIsNotCollected = false;
-	}while (dataIsNotCollected);
+	} while (dataIsNotCollected);
 }
 
 
+//*****************Equivelant of uv.begin() in the Adafruit SI1145 library, but without the restart of wire.begin() and the initial test read check for 0x45 from 0x00*****************
 bool initializeUV()
 {
-   //Equivelant of uv.begin() in the Adafruit SI1145 library, but without the restart of wire.begin() and the initial test read check for 0x45 from 0x00
-   
-//I2C SI1145 UV Sensor Parameters - from library
-/* COMMANDS */
-#define SI1145_PARAM_QUERY 0x80
-#define SI1145_PARAM_SET 0xA0
-#define SI1145_NOP 0x0
-#define SI1145_RESET    0x01
-#define SI1145_BUSADDR    0x02
-#define SI1145_PS_FORCE    0x05
-#define SI1145_ALS_FORCE    0x06
-#define SI1145_PSALS_FORCE    0x07
-#define SI1145_PS_PAUSE    0x09
-#define SI1145_ALS_PAUSE    0x0A
-#define SI1145_PSALS_PAUSE    0xB
-#define SI1145_PS_AUTO    0x0D
-#define SI1145_ALS_AUTO   0x0E
-#define SI1145_PSALS_AUTO 0x0F
-#define SI1145_GET_CAL    0x12
-
-/* Parameters */
-#define SI1145_PARAM_I2CADDR 0x00
-#define SI1145_PARAM_CHLIST   0x01
-#define SI1145_PARAM_CHLIST_ENUV 0x80
-#define SI1145_PARAM_CHLIST_ENAUX 0x40
-#define SI1145_PARAM_CHLIST_ENALSIR 0x20
-#define SI1145_PARAM_CHLIST_ENALSVIS 0x10
-#define SI1145_PARAM_CHLIST_ENPS1 0x01
-#define SI1145_PARAM_CHLIST_ENPS2 0x02
-#define SI1145_PARAM_CHLIST_ENPS3 0x04
-
-#define SI1145_PARAM_PSLED12SEL   0x02
-#define SI1145_PARAM_PSLED12SEL_PS2NONE 0x00
-#define SI1145_PARAM_PSLED12SEL_PS2LED1 0x10
-#define SI1145_PARAM_PSLED12SEL_PS2LED2 0x20
-#define SI1145_PARAM_PSLED12SEL_PS2LED3 0x40
-#define SI1145_PARAM_PSLED12SEL_PS1NONE 0x00
-#define SI1145_PARAM_PSLED12SEL_PS1LED1 0x01
-#define SI1145_PARAM_PSLED12SEL_PS1LED2 0x02
-#define SI1145_PARAM_PSLED12SEL_PS1LED3 0x04
-
-#define SI1145_PARAM_PSLED3SEL   0x03
-#define SI1145_PARAM_PSENCODE   0x05
-#define SI1145_PARAM_ALSENCODE  0x06
-
-#define SI1145_PARAM_PS1ADCMUX   0x07
-#define SI1145_PARAM_PS2ADCMUX   0x08
-#define SI1145_PARAM_PS3ADCMUX   0x09
-#define SI1145_PARAM_PSADCOUNTER   0x0A
-#define SI1145_PARAM_PSADCGAIN 0x0B
-#define SI1145_PARAM_PSADCMISC 0x0C
-#define SI1145_PARAM_PSADCMISC_RANGE 0x20
-#define SI1145_PARAM_PSADCMISC_PSMODE 0x04
-
-#define SI1145_PARAM_ALSIRADCMUX   0x0E
-#define SI1145_PARAM_AUXADCMUX   0x0F
-
-#define SI1145_PARAM_ALSVISADCOUNTER   0x10
-#define SI1145_PARAM_ALSVISADCGAIN 0x11
-#define SI1145_PARAM_ALSVISADCMISC 0x12
-#define SI1145_PARAM_ALSVISADCMISC_VISRANGE 0x20
-
-#define SI1145_PARAM_ALSIRADCOUNTER   0x1D
-#define SI1145_PARAM_ALSIRADCGAIN 0x1E
-#define SI1145_PARAM_ALSIRADCMISC 0x1F
-#define SI1145_PARAM_ALSIRADCMISC_RANGE 0x20
-
-#define SI1145_PARAM_ADCCOUNTER_511CLK 0x70
-
-#define SI1145_PARAM_ADCMUX_SMALLIR  0x00
-#define SI1145_PARAM_ADCMUX_LARGEIR  0x03
-
-
-
-/* REGISTERS */
-#define SI1145_REG_PARTID  0x00
-#define SI1145_REG_REVID  0x01
-#define SI1145_REG_SEQID  0x02
-
-#define SI1145_REG_INTCFG  0x03
-#define SI1145_REG_INTCFG_INTOE 0x01
-#define SI1145_REG_INTCFG_INTMODE 0x02
-
-#define SI1145_REG_IRQEN  0x04
-#define SI1145_REG_IRQEN_ALSEVERYSAMPLE 0x01
-#define SI1145_REG_IRQEN_PS1EVERYSAMPLE 0x04
-#define SI1145_REG_IRQEN_PS2EVERYSAMPLE 0x08
-#define SI1145_REG_IRQEN_PS3EVERYSAMPLE 0x10
-
-
-#define SI1145_REG_IRQMODE1 0x05
-#define SI1145_REG_IRQMODE2 0x06
-
-#define SI1145_REG_HWKEY  0x07
-#define SI1145_REG_MEASRATE0 0x08
-#define SI1145_REG_MEASRATE1  0x09
-#define SI1145_REG_PSRATE  0x0A
-#define SI1145_REG_PSLED21  0x0F
-#define SI1145_REG_PSLED3  0x10
-#define SI1145_REG_UCOEFF0  0x13
-#define SI1145_REG_UCOEFF1  0x14
-#define SI1145_REG_UCOEFF2  0x15
-#define SI1145_REG_UCOEFF3  0x16
-#define SI1145_REG_PARAMWR  0x17
-#define SI1145_REG_COMMAND  0x18
-#define SI1145_REG_RESPONSE  0x20
-#define SI1145_REG_IRQSTAT  0x21
-#define SI1145_REG_IRQSTAT_ALS  0x01
-
-#define SI1145_REG_ALSVISDATA0 0x22
-#define SI1145_REG_ALSVISDATA1 0x23
-#define SI1145_REG_ALSIRDATA0 0x24
-#define SI1145_REG_ALSIRDATA1 0x25
-#define SI1145_REG_PS1DATA0 0x26
-#define SI1145_REG_PS1DATA1 0x27
-#define SI1145_REG_PS2DATA0 0x28
-#define SI1145_REG_PS2DATA1 0x29
-#define SI1145_REG_PS3DATA0 0x2A
-#define SI1145_REG_PS3DATA1 0x2B
-#define SI1145_REG_UVINDEX0 0x2C
-#define SI1145_REG_UVINDEX1 0x2D
-#define SI1145_REG_PARAMRD 0x2E
-#define SI1145_REG_CHIPSTAT 0x30
-
-#define SI1145_ADDR 0x60
+    //I2C SI1145 UV Sensor Parameters - from library
+    /* COMMANDS */
+    #define SI1145_PARAM_QUERY 0x80
+    #define SI1145_PARAM_SET 0xA0
+    #define SI1145_NOP 0x0
+    #define SI1145_RESET    0x01
+    #define SI1145_BUSADDR    0x02
+    #define SI1145_PS_FORCE    0x05
+    #define SI1145_ALS_FORCE    0x06
+    #define SI1145_PSALS_FORCE    0x07
+    #define SI1145_PS_PAUSE    0x09
+    #define SI1145_ALS_PAUSE    0x0A
+    #define SI1145_PSALS_PAUSE    0xB
+    #define SI1145_PS_AUTO    0x0D
+    #define SI1145_ALS_AUTO   0x0E
+    #define SI1145_PSALS_AUTO 0x0F
+    #define SI1145_GET_CAL    0x12
+    
+    /* Parameters */
+    #define SI1145_PARAM_I2CADDR 0x00
+    #define SI1145_PARAM_CHLIST   0x01
+    #define SI1145_PARAM_CHLIST_ENUV 0x80
+    #define SI1145_PARAM_CHLIST_ENAUX 0x40
+    #define SI1145_PARAM_CHLIST_ENALSIR 0x20
+    #define SI1145_PARAM_CHLIST_ENALSVIS 0x10
+    #define SI1145_PARAM_CHLIST_ENPS1 0x01
+    #define SI1145_PARAM_CHLIST_ENPS2 0x02
+    #define SI1145_PARAM_CHLIST_ENPS3 0x04
+    
+    #define SI1145_PARAM_PSLED12SEL   0x02
+    #define SI1145_PARAM_PSLED12SEL_PS2NONE 0x00
+    #define SI1145_PARAM_PSLED12SEL_PS2LED1 0x10
+    #define SI1145_PARAM_PSLED12SEL_PS2LED2 0x20
+    #define SI1145_PARAM_PSLED12SEL_PS2LED3 0x40
+    #define SI1145_PARAM_PSLED12SEL_PS1NONE 0x00
+    #define SI1145_PARAM_PSLED12SEL_PS1LED1 0x01
+    #define SI1145_PARAM_PSLED12SEL_PS1LED2 0x02
+    #define SI1145_PARAM_PSLED12SEL_PS1LED3 0x04
+    
+    #define SI1145_PARAM_PSLED3SEL   0x03
+    #define SI1145_PARAM_PSENCODE   0x05
+    #define SI1145_PARAM_ALSENCODE  0x06
+    
+    #define SI1145_PARAM_PS1ADCMUX   0x07
+    #define SI1145_PARAM_PS2ADCMUX   0x08
+    #define SI1145_PARAM_PS3ADCMUX   0x09
+    #define SI1145_PARAM_PSADCOUNTER   0x0A
+    #define SI1145_PARAM_PSADCGAIN 0x0B
+    #define SI1145_PARAM_PSADCMISC 0x0C
+    #define SI1145_PARAM_PSADCMISC_RANGE 0x20
+    #define SI1145_PARAM_PSADCMISC_PSMODE 0x04
+    
+    #define SI1145_PARAM_ALSIRADCMUX   0x0E
+    #define SI1145_PARAM_AUXADCMUX   0x0F
+    
+    #define SI1145_PARAM_ALSVISADCOUNTER   0x10
+    #define SI1145_PARAM_ALSVISADCGAIN 0x11
+    #define SI1145_PARAM_ALSVISADCMISC 0x12
+    #define SI1145_PARAM_ALSVISADCMISC_VISRANGE 0x20
+    
+    #define SI1145_PARAM_ALSIRADCOUNTER   0x1D
+    #define SI1145_PARAM_ALSIRADCGAIN 0x1E
+    #define SI1145_PARAM_ALSIRADCMISC 0x1F
+    #define SI1145_PARAM_ALSIRADCMISC_RANGE 0x20
+    
+    #define SI1145_PARAM_ADCCOUNTER_511CLK 0x70
+    
+    #define SI1145_PARAM_ADCMUX_SMALLIR  0x00
+    #define SI1145_PARAM_ADCMUX_LARGEIR  0x03
+    
+    
+    
+    /* REGISTERS */
+    #define SI1145_REG_PARTID  0x00
+    #define SI1145_REG_REVID  0x01
+    #define SI1145_REG_SEQID  0x02
+    
+    #define SI1145_REG_INTCFG  0x03
+    #define SI1145_REG_INTCFG_INTOE 0x01
+    #define SI1145_REG_INTCFG_INTMODE 0x02
+    
+    #define SI1145_REG_IRQEN  0x04
+    #define SI1145_REG_IRQEN_ALSEVERYSAMPLE 0x01
+    #define SI1145_REG_IRQEN_PS1EVERYSAMPLE 0x04
+    #define SI1145_REG_IRQEN_PS2EVERYSAMPLE 0x08
+    #define SI1145_REG_IRQEN_PS3EVERYSAMPLE 0x10
+    
+    
+    #define SI1145_REG_IRQMODE1 0x05
+    #define SI1145_REG_IRQMODE2 0x06
+    
+    #define SI1145_REG_HWKEY  0x07
+    #define SI1145_REG_MEASRATE0 0x08
+    #define SI1145_REG_MEASRATE1  0x09
+    #define SI1145_REG_PSRATE  0x0A
+    #define SI1145_REG_PSLED21  0x0F
+    #define SI1145_REG_PSLED3  0x10
+    #define SI1145_REG_UCOEFF0  0x13
+    #define SI1145_REG_UCOEFF1  0x14
+    #define SI1145_REG_UCOEFF2  0x15
+    #define SI1145_REG_UCOEFF3  0x16
+    #define SI1145_REG_PARAMWR  0x17
+    #define SI1145_REG_COMMAND  0x18
+    #define SI1145_REG_RESPONSE  0x20
+    #define SI1145_REG_IRQSTAT  0x21
+    #define SI1145_REG_IRQSTAT_ALS  0x01
+    
+    #define SI1145_REG_ALSVISDATA0 0x22
+    #define SI1145_REG_ALSVISDATA1 0x23
+    #define SI1145_REG_ALSIRDATA0 0x24
+    #define SI1145_REG_ALSIRDATA1 0x25
+    #define SI1145_REG_PS1DATA0 0x26
+    #define SI1145_REG_PS1DATA1 0x27
+    #define SI1145_REG_PS2DATA0 0x28
+    #define SI1145_REG_PS2DATA1 0x29
+    #define SI1145_REG_PS3DATA0 0x2A
+    #define SI1145_REG_PS3DATA1 0x2B
+    #define SI1145_REG_UVINDEX0 0x2C
+    #define SI1145_REG_UVINDEX1 0x2D
+    #define SI1145_REG_PARAMRD 0x2E
+    #define SI1145_REG_CHIPSTAT 0x30
+    
+    #define SI1145_ADDR 0x60
 
   uint8_t id = SI1145i2cread8(0x00); //Search for this on the 0x00 address, this is required as part of the startup
   Particle.publish(String::format("UV Sensor ID: %d - Should be equivelant of 0x45 ",id));
@@ -779,6 +823,7 @@ bool initializeUV()
      {
            return false; // (the note) look for SI1145, if the value 0x45 is not found, exit the function - this causes problems with multiple devices!  Force this to pass if it gets stuck and you know the sensor is present
      }
+     
   //Apply the reset sequence
   SI1145i2cwrite8(SI1145_REG_MEASRATE0, 0);
   SI1145i2cwrite8(SI1145_REG_MEASRATE1, 0);
@@ -791,7 +836,6 @@ bool initializeUV()
   SI1145i2cwrite8(SI1145_REG_COMMAND, SI1145_RESET);
   delay(10);
   SI1145i2cwrite8(SI1145_REG_HWKEY, 0x17);
-  
   delay(10);
   
     /***********************************/
@@ -805,6 +849,7 @@ bool initializeUV()
   SI1145i2cwriteParam(SI1145_PARAM_CHLIST, SI1145_PARAM_CHLIST_ENUV |
   SI1145_PARAM_CHLIST_ENALSIR | SI1145_PARAM_CHLIST_ENALSVIS |
   SI1145_PARAM_CHLIST_ENPS1);
+  
   // enable interrupt on every sample
   SI1145i2cwrite8(SI1145_REG_INTCFG, SI1145_REG_INTCFG_INTOE);  
   SI1145i2cwrite8(SI1145_REG_IRQEN, SI1145_REG_IRQEN_ALSEVERYSAMPLE);  
@@ -850,21 +895,13 @@ bool initializeUV()
   // auto run
   SI1145i2cwrite8(SI1145_REG_COMMAND, SI1145_PSALS_AUTO);
 }
+//****************************************************************************************
 
-//Values for Light/UV/IR Sensor
-float lightVisTotal = 0.0;
-unsigned int lightVisReadingCount = 0;
-
-float lightUVTotal = 0.0;
-unsigned int lightUVReadingCount = 0;
-
-float lightIRTotal = 0.0;
-unsigned int lightIRReadingCount = 0;
 
 float getUV()
 {
     mux.setChannel(0); //switch  to 0 before initializing the UV sensor
-        delay (50);
+        delay (10);
         float readval = uv.readUV();
          //If the result is reasonable, add it to the running mean
           if(readval > 0 && readval < 10) 
@@ -874,41 +911,43 @@ float getUV()
                   lightUVReadingCount++;
                 }
   mux.setChannel(1); //switch  to 1 before leaving function
-  delay (50);
+  delay (10);
   return readval;
 }
+
 
 float getVis()
 {
     mux.setChannel(0); //switch  to 0 before initializing the UV sensor
-        delay (50);
+        delay (10);
         float readval = uv.readVisible();
          //If the result is reasonable, add it to the running mean
-        if(readval > 0 && readval < 1000) 
+        if(readval > 0 && readval < 5000) 
             {
              // Add the observation to the running sum, and increment the number of observations
             lightVisTotal += readval;
             lightVisReadingCount++;
              }
    mux.setChannel(1); //switch  to 1 before leaving function
-    delay (50);
+    delay (10);
    return readval;
 }
+
 
 float getIR()
 {
     mux.setChannel(0); //switch  to 0 before initializing the UV sensor
-        delay (50);
+        delay (10);
         float readval = uv.readIR();
          //If the result is reasonable, add it to the running mean
-        if(readval > 0 && readval < 1000) 
+        if(readval > 0 && readval < 5000) 
          {
            // Add the observation to the running sum, and increment the number of observations
            lightIRTotal += readval;
            lightIRReadingCount++;
          }
     mux.setChannel(1); //switch  to 1 before leaving function
-     delay (50);
+     delay (10);
     return readval;
 }
 
@@ -917,7 +956,7 @@ float getUVReadings()
 {
     //average readings from UV/ VIS/IR sensor, average and return
     //UV Index
-   if (lightUVReadingCount ==0)
+   if (lightUVReadingCount == 0)
    {
        lightUVReadingCount=1; //avoid div by zero if no measurements recorded
    }
@@ -927,6 +966,7 @@ float getUVReadings()
     
 	return UVindex/100; //return UVindex/100
 }
+
 
 float getVisReadings()
 {
@@ -944,6 +984,7 @@ float getVisReadings()
 	//return vis in ADC units;
 }
 
+
 float getIRReadings()
 {
     //average readings from UV/ VIS/IR sensor, average and return
@@ -960,9 +1001,10 @@ float getIRReadings()
 	//return IR in ADC units;
 }
 
-//From SI1145 Library - I2C functions
-void SI1145i2cwrite8(uint8_t reg, uint8_t val) {
 
+//*******************From SI1145 Library - I2C functions*****************************
+void SI1145i2cwrite8(uint8_t reg, uint8_t val) 
+{
   Wire.beginTransmission(SI1145_ADDR); // start transmission to SI1145 device, default address is 0x60
   Wire.write(reg); // sends register address to write
   Wire.write(val); // sends value
@@ -970,7 +1012,8 @@ void SI1145i2cwrite8(uint8_t reg, uint8_t val) {
 }
 
 //From SI1145 Library - I2C functions
-uint8_t SI1145i2cread8(uint8_t reg) {
+uint8_t SI1145i2cread8(uint8_t reg) 
+{
 
   Wire.beginTransmission(SI1145_ADDR); // start transmission to SI1145 device, default address is 0x60
   Wire.write((uint8_t)reg);
@@ -981,41 +1024,44 @@ uint8_t SI1145i2cread8(uint8_t reg) {
 }
 
 //From SI1145 Library - I2C functions
-uint8_t SI1145i2cwriteParam(uint8_t p, uint8_t v) {
+uint8_t SI1145i2cwriteParam(uint8_t p, uint8_t v) 
+{
 
   SI1145i2cwrite8(SI1145_REG_PARAMWR, v);
   SI1145i2cwrite8(SI1145_REG_COMMAND, p | SI1145_PARAM_SET);
   return SI1145i2cread8(SI1145_REG_PARAMRD);
 }
 
-//Main Loop
-void loop() {
 
+//*******Main Loop**********
+void loop() 
+{
     // Capture any sensors that need to be polled (temp, humidity, pressure, wind vane)
-    // The rain and wind speed sensors use interrupts, and so data is collected "in the background"
-    
-    //if(timeNextSensorReading <= millis()) {
+    if(timeNextSensorReading <= millis()) 
+    {
         mux.setChannel(0);  //Switch to Main I2C Bus
-        delay (20);
+            delay (10);
             getIR(); //Read IR value from SI1145 UV/VIS/IR Sensor
             getVis(); //Read visible light value from SI1145 UV/VIS/IR Sensor
             getUV(); //Read UV Index value from SI1145 UV/VIS/IR Sensor
         mux.setChannel(1);  //Switch to Main I2C Bus
-        delay(20);
+           delay(10);
             captureTempHumidityPressure();
             captureWindVane();
         // Schedule the next sensor reading
         timeNextSensorReading = millis() + sensorCapturePeriod;
-    //}
+    }
 
 	if(timeNextGeigerReading <= millis())
 	{ // turn on geiger counter
 		digitalWrite(GeigerPowerPin, LOW); //enable geige counter
 		GEIGER_READING=true;
-		if(timeNextGeigerReading+MINUTE <= millis()){ // start taking data after a minute
+		if(timeNextGeigerReading+MINUTE <= millis())
+		{ // start taking data after a minute
 			captureGeigerValues();
 			GEIGER_READING=true;
-			if(timeNextGeigerReading + 2*MINUTE <= millis()){
+			if(timeNextGeigerReading + 2*MINUTE <= millis())
+			{
 				timeNextGeigerReading = 10*MINUTE+millis();
 				digitalWrite(GeigerPowerPin, HIGH);  //disable geige counter, end reading session
 				GEIGER_READING=false;  //disable geige counter, end reading session
@@ -1023,8 +1069,7 @@ void loop() {
 		}	
 	}		
 
-	
-    // Publish the data collected to Particle and to ThingSpeak
+   // Publish the data collected to Particle and MQTT
     if(timeNextPublish <= millis()) 
     {
         // Get the data to be published
@@ -1045,12 +1090,27 @@ void loop() {
 		    float vis = getVisReadings(); //return averaged values for Vis
 		    float IR= getIRReadings(); //return averaged values for IR
 		    
-
-		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex,vis,IR);
-		//Serial.println("After Publish");
-        // Schedule the next publish event
-        timeNextPublish = millis() + publishPeriod;
+        if (client.isConnected())
+            {
+    		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex,vis,IR);
+    		Serial.println("Just Published to MQTT");
+            }
+         else
+             {   
+              Particle.publish(String::format("Client Publish Fail: Now %f Min. Runtime", (millis())/60000)); //notify of connection failure to MQTT Broker (provided general connectivity)
+              client.connect("XXX.cloudmqtt.com", "XXXXXXXX", "XXXXXX"); //Try to reconnect for next round
+             }
+         
+        
+            timeNextPublish = millis() + publishPeriod;  // Schedule the next publish event
     }
     
-    delay(10);
+    if (millis() < lastmillis)
+        {
+          lastmillis  =  millis();  //millis() roll over protection
+          timeNextPublish =  millis() + publishPeriod;  //millis() roll over protection
+        }
+
+// The rain and wind speed sensors use interrupts, and so data is collected "in the background"
+    delay(2); //delay to slow down loop speed
 }
