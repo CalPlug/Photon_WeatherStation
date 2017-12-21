@@ -200,28 +200,35 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
 //===========================================================
 // MQTT Client
 //===========================================================
- void callback(char* topic, byte* payload, unsigned int length) // dont need current function -- used for subscribe, this is from the example, but can be adapted later
+ void callback(char* topic, byte* payload, unsigned int length) // dont need current function for basic operation-- used for subscribe, this is from the example, but can be adapted later
  {
      char p[length + 1];
      memcpy(p, payload, length);
      p[length] = NULL;
-     if (!strcmp(p, "VAL1"))
+     if (!strcmp(p, "TEST1"))
+     {
          Serial.println("VAL 1 RCVD from MQTT Subscribe Read");
-     else if (!strcmp(p, "VAL2"))
-         Serial.println("VAL 2 RCVD from MQTT Subscribe Read");
-     else if (!strcmp(p, "VAL3"))
-         Serial.println("VAL 3 RCVD from MQTT Subscribe Read");
+         Particle.publish(String::format("Test Post 1 Read! (%f Min. Runtime)", (millis())/60000));
+     }
+     else if (!strcmp(p, "TEST2"))
+     {
+         Particle.publish(String::format("Test Post 2 Read! (%f Min. Runtime)", (millis())/60000));
+     }
+     else if (!strcmp(p, "TEST3"))
+     {
+         Particle.publish(String::format("Test Post 3 Read! (%f Min. Runtime)", (millis())/60000));
+     }
      else
      {
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("XXXXSERVERXXXXX", 14668, callback);  //NOTE:  Object created after the callback is setup
+ MQTT client("m12.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("XXXXXSERVERXXXXXX", "XXXXUSERXXXXX", "XXXXPWDXXXX");
+     client.connect("xxxxxserverxxxxx", "xxxxuserxxxx", "xxxxpwdxxxx");
     // publish/subscribe
      if (client.isConnected()) 
      {
@@ -239,8 +246,8 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
         float dewpointC = dewpoint(tempC,humidityRH);
         float dewpointF = (dewpointC * 1.8) + 32;
         float partialpressureH2O = vaporpressureH2O(dewpointC);
-        //float partialpressureH2Osat = vaporpressureH2Osat(tempC);  //extra function that is redundant 
-        //float rh_calc= (partialpressureH2O/partialpressureH2Osat)*100;  //calculate RH from e and es, extra function that is redundant 
+        //float partialpressureH2Osat = vaporpressureH2Osat(tempC);  //extra function that is not required, calculation of vapor pressure of water at the current temperature
+        //float rh_calc= (partialpressureH2O/partialpressureH2Osat)*100;  //calculate RH from e and es, extra function that is redundant, back calculation check of RH value
 
  	snprintf(payload, sizeof(payload), "%0.2f", tempF);
  	client.publish("Weather_Station/Temperature_F", payload);
@@ -365,6 +372,7 @@ void captureTempHumidityPressure()
       tempCTotal += tempC;
       tempCReadingCount++;
   }
+  
 
   //Measure Pressure from the MPL3115A2
   float pressurePascals = sensor.readPressure();
@@ -1049,8 +1057,9 @@ void loop()
         // Schedule the next sensor reading
         timeNextSensorReading = millis() + sensorCapturePeriod;
     }
-
-	if(timeNextGeigerReading <= millis())
+    
+    GEIGER_READING=false;  //disable geiger counter, end reading session, this is the default case that will be quickly overridden by the IF statemet below if reading is intended
+	if(timeNextGeigerReading <= millis())  //Activate geiger counter
 	{ // turn on geiger counter
 	    GEIGER_READING=true;
 		digitalWrite(GeigerPowerPin, LOW); //enable geige counter
@@ -1061,7 +1070,7 @@ void loop()
 			if(timeNextGeigerReading + (geigerstart*60000) <= millis())
 			{
 				timeNextGeigerReading = (geigerdelay*60000) + millis();
-				digitalWrite(GeigerPowerPin, HIGH);  //disable geige counter, end reading session
+				digitalWrite(GeigerPowerPin, HIGH);  //disable geiger counter, end reading session
 				GEIGER_READING=false;  //disable geige counter, end reading session
 			}
 		}	
@@ -1096,7 +1105,7 @@ void loop()
          else
              {   
               Particle.publish(String::format("Client Publish Fail: Now %f Min. Runtime", (millis())/60000)); //notify of connection failure to MQTT Broker (provided general connectivity)
-              client.connect("XXXXXSERVERXXXXX", "XXXUSERXXXX", "XXXXPWDXXXXXX"); //Try to reconnect for next round
+              client.connect("xxxxxSERVERxxxxxxxx", "xxxxuserxxxxx", "xxxxxxpasswordxxxxx"); //Try to reconnect for next round
              }
          
         
