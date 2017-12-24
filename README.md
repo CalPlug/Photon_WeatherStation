@@ -21,6 +21,6 @@ Mindy Saylors, EE Junior @ UC Irvine
 Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 California Institute for Telecommunications and Information Technology (Calit2), 2017
 University of California, Irvine
-Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
+Extended components of project copyright Regents of the Univeristy of California and released into the public domain.
 
 Released 12/5/2017
