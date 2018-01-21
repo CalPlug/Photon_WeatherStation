@@ -3,10 +3,13 @@ from collections import defaultdict
 import paho.mqtt.client as mqtt
 import time
 import datetime
+import sys
+import os
 
 prev_msg = ''
 weather_dict = defaultdict(lambda: '')
 timer = time.time()
+connected_with_result_code_zero = 0
 #Improve readability of time
 
 def parse_msg(msg) -> tuple:
@@ -32,8 +35,13 @@ def parse_geiger(geiger_str) -> tuple:
 		return ['']*7
 
 def on_connect(client, userdata, flags, rc):
+	global connected_with_result_code_zero
 	print("Connected with result code " + str(rc))
-
+	connected_with_result_code_zero += 1
+	if connected_with_result_code_zero > 1 :
+		print("Disconnected -> restarting server...")
+		os.execl(sys.executable, 'python', __file__, *sys.argv[1:])
+	
 #Add on message callbacks for all topics and construct tuple
 
 def on_message(client, userdata, msg):
