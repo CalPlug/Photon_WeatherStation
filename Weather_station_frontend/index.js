@@ -1,19 +1,21 @@
 var express = require('express');
-var app = express();
+var app     = express();
 var engine  = require('ejs-mate');
 require('dotenv').config();
 
-var api    = require('./api');
+// Print all exceptions
+process.on('uncaughtException', function (err) {
+    console.log("Error: " + err);
+});
+
+var api = require('./api');
 
 app.engine('ejs', engine);
 
 app.set('views',__dirname + '/views');
 app.set('view engine', 'ejs'); //Use EJS template engine
 
-// Print all exceptions
-process.on('uncaughtException', function (err) {
-    console.log("Error: " + err);
-});
+
 
 //Static Public Files
 app.use('/public', express.static('public'));

@@ -1,6 +1,8 @@
 var app = require('express');
 const router = app.Router({ mergeParams: true });
 
+var db = require('../util/dbmanage');
+
 // GET /api/categories
 // Get the categories, e.g., Temperature_F, Temperature_C,...
 router.get('/categories', function(req, res){
