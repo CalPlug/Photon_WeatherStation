@@ -3,6 +3,8 @@ var app = express();
 var engine  = require('ejs-mate');
 require('dotenv').config();
 
+var api    = require('./api');
+
 app.engine('ejs', engine);
 
 app.set('views',__dirname + '/views');
@@ -16,9 +18,22 @@ process.on('uncaughtException', function (err) {
 //Static Public Files
 app.use('/public', express.static('public'));
 
+app.use('/api', api);
+
 app.get('/', function(req, res){
-    res.render('pages/testpage', {});
+    res.render('pages/testpage', {
+        'title':'Home'
+    });
 });
+
+app.get('/about', function(req, res){
+    res.render('pages/stdpage', {
+        'title':'About',
+        'content':"This is a frontend interface for viewing data recorded by the weather station."
+    })
+});
+
+
 
 
 //Start Server
