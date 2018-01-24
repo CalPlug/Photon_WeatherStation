@@ -6,7 +6,12 @@ This Node/Angular-based web applications allows for the viewing of weather patte
 
 ## Running the application
 
-With @angular-cli installed, in the terminal, use the command:
+If angular-cli is not yet installed, run the command:
+```
+npm install -g @angular/cli
+```
+
+Then, in the terminal, use the command:
 ```
 npm start
 ```
