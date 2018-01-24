@@ -18,7 +18,7 @@ Sid Kasat, CS Junior @ UC Irvine
 
 Mindy Saylors, EE Junior @ UC Irvine
 
-Hamed Ghafarshad, EE EE Junior @ UC Irvine
+Hamed Ghafarshad, EE Junior @ UC Irvine
 
 Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 California Institute for Telecommunications and Information Technology (Calit2), 2017
