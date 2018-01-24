@@ -12,10 +12,10 @@ var api = require('./api');
 
 app.use('/api', api);
 
-app.use(express.static(__dirname));
-
+//Angular dist created after ng build
+app.use(express.static(path.join(__dirname,'dist')));
 app.get('/*', function (req, res) {
-    res.sendFile(path.join(__dirname,'index.html'));
+    res.sendFile(path.join(__dirname,'dist/index.html'));
 });
 
 //Start Server

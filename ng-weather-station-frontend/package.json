@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "ng": "ng",
-    "start": "ng build && cp -R api dist/api && cp -R util dist/util && cp app.js dist && node dist/app",
+    "start": "ng build && node dist/app",
     "build": "ng build --prod",
     "test": "ng test",
     "lint": "ng lint",
