@@ -15,6 +15,8 @@ export class DatapageComponent implements OnInit {
     private apiUrl = 'api/';
 
     categories:Category[] = [];
+    cateogriesObj= {};
+    categoryData = {};
 
     constructor( private http: HttpClient ) { }
 
@@ -31,20 +33,30 @@ export class DatapageComponent implements OnInit {
 
                 var parent:string = cat.split('_',1)[0];
 
-                if (parent && parent!="utcTime") {
-                    var catObj = new Category(parent);
+                if (parent) {
+                    
+                    if (!(parent in this.cateogriesObj))
+                        this.cateogriesObj[parent] = new Category(parent);
 
                     if (cat != parent){
                         var index = cat.indexOf('_');
                         var child = cat.substring(index+1);
-                        catObj.children.push(child);
+                        this.cateogriesObj[parent].children.push(child);
                     }
-
-                    this.categories.push(catObj);
                 }
             }
+            this.categories = Object.values(this.cateogriesObj);
             // console.log(this.categories);
         });
     }
+
+    getCategoryData(category){
+        this.http.get(this.apiUrl+'/data/'+category).subscribe(data => {
+            var catData:string[] = data['data'];
+            this.categoryData[category] = catData;
+        });
+    }
+
+
 
 }

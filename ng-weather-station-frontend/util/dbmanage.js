@@ -22,7 +22,13 @@ var queryCategories = function(callback){
             function (err, result){
                 if (err){callback(err, []); db.close(); return;}
 
-                callback(null, Object.keys(result));
+                var currKeys = Object.keys(result);
+                var index = currKeys.indexOf('utcTime')
+                if (index > -1){
+                    currKeys.splice(index, 1);
+                }
+
+                callback(null, currKeys);
                 db.close();
             }
         ));

@@ -5,4 +5,10 @@
 
 <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
     <h2>{{category.name}}</h2>
+    <ul *ngIf="category.children?.length>0; else single">
+        <li *ngFor="let child of category.children">
+            {{category.name + '_' + child}}
+        </li>
+    </ul>
+    <ng-template #single>derp</ng-template>
 </div>
