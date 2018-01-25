@@ -10,18 +10,30 @@ dbClient.connect(uriMongo, function(err, db){
     db.close();
 });
 
-//DB stuff
-// These functions are placeholders for now.
 
-var queryCategories = function(){
-    return 'derp';
+// Coded under the assumption that all documents will be consistent.
+// Based on the Python code, they will be!
+var queryCategories = function(callback){
+
+    dbClient.connect(uriMongo, function(err, db){
+        if (err){callback(err, []); db.close(); return;}
+
+        db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).findOne({}, (
+            function (err, result){
+                if (err){callback(err, []); db.close(); return;}
+
+                callback(null, Object.keys(result));
+                db.close();
+            }
+        ));
+    });
 }
 
 var queryDataByCategory = function(category, callback, hoursPast){
     if (typeof(hoursPast) === 'undefined') hoursPast = 24;
-    
+
     dbClient.connect(uriMongo, function(err, db){
-        if (err){callback(err, []);}
+        if (err){callback(err, []); db.close(); return;}
         
         var date = new Date(new Date().getTime() - (hoursPast * 60 * 60 * 1000));
         db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find(
@@ -35,6 +47,7 @@ var queryDataByCategory = function(category, callback, hoursPast){
         ).toArray(
             callback
         );
+        db.close();
     });
 }
 

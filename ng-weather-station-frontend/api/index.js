@@ -7,13 +7,17 @@ var db = require('../util/dbmanage');
 // Get the categories, e.g., Temperature_F, Temperature_C,...
 router.get('/categories', function(req, res){
     
-    //Initial premise testing
-    res.status(200).json(
-        {
-            'status':"OK", 
-            'categories':['Temperature_F', 'Temperature_C']
-        }
-    );
+    db.queryCategories(function(err, result){
+        //Initial premise testing
+        res.status(200).json(
+            {
+                'status':"OK", 
+                'categories':result
+            }
+        );
+    });
+
+    
 });
 
 // GET /api/data/<category>
