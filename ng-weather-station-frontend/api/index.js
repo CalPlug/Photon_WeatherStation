@@ -20,14 +20,18 @@ router.get('/categories', function(req, res){
 //Get the recorded data for a category
 router.get('/data/:category', function(req, res){
 
-    //Initial premise testing
-    res.status(200).json(
-        {
-            'status':"OK", 
-            'category':req.params.category,
-            'data':['25', '70']
-        }
-    );
+    db.queryDataByCategory(req.params.category, function(err, result){
+        //Initial premise testing
+        res.status(200).json(
+            {
+                'status':"OK", 
+                'category':req.params.category,
+                'data':result
+            }
+        );
+    }, 24);
+
+    
 });
 
 module.exports = router;
