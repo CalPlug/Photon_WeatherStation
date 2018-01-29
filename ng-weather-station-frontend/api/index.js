@@ -33,7 +33,7 @@ router.get('/data/:category', function(req, res){
                 'data':result
             }
         );
-    }, 24);
+    });
 
     
 });

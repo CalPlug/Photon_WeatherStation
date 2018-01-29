@@ -36,7 +36,7 @@ var queryCategories = function(callback){
 }
 
 var queryDataByCategory = function(category, callback, hoursPast){
-    if (typeof(hoursPast) === 'undefined') hoursPast = 24;
+    if (typeof(hoursPast) === 'undefined') hoursPast = 120;
 
     dbClient.connect(uriMongo, function(err, db){
         if (err){callback(err, []); db.close(); return;}

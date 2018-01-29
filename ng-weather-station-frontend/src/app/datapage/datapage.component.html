@@ -2,13 +2,19 @@
     Data view coming soon!
 </h1>
 <h5>View weather data from the past 24 hours.</h5>
-
-<div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
-    <h2>{{category.name}}</h2>
-    <ul *ngIf="category.children?.length>0; else single">
-        <li *ngFor="let child of category.children">
-            {{category.name + '_' + child}}
-        </li>
-    </ul>
-    <ng-template #single>derp</ng-template>
-</div>
+<div id="allCats" >
+    <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
+        <h2>{{category.name}}</h2>
+        <div style="height:400px; overflow:hidden;" *ngIf="checkDefined(category.name)">
+                <ngx-charts-line-chart
+                    [results]="categoryData[category.name]"
+                    [gradient]="gradient"
+                    [legend]="true"
+                    [xAxis]="true"
+                    [yAxis]="true"
+                    [autoScale]="true"
+                    (select)="dataSelect($event)">
+                </ngx-charts-line-chart>
+        </div>
+    </div>
+</div>  

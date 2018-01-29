@@ -13,6 +13,8 @@ var api = require('./api');
 app.use('/api', api);
 
 //Angular dist created after ng build
+app.use(express.static('node_modules'));
+app.use('/node_modules', express.static('node_modules'))
 app.use(express.static(path.join(__dirname,'dist')));
 app.get('/*', function (req, res) {
     res.sendFile(path.join(__dirname,'dist/index.html'));
