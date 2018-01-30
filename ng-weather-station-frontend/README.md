@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This Node/Angular-based web applications allows for the viewing of weather patterns recorded by the Weather Station and stored into a database.
+This Node/Angular-based web application allows for the viewing of weather patterns recorded by the Weather Station and stored into a database.
 
 ## Running the application
 
