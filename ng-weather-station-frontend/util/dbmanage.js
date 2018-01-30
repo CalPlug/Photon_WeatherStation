@@ -6,7 +6,7 @@ dbClient.connect(uriMongo, function(err, db){
         console.error('Could not connect to database.\n'+err);
         return;
     }
-    console.log('Successfully connection to database');
+    console.log('Successful connection to database');
     db.close();
 });
 
@@ -36,7 +36,7 @@ var queryCategories = function(callback){
 }
 
 var queryDataByCategory = function(category, callback, hoursPast){
-    if (typeof(hoursPast) === 'undefined') hoursPast = 120;
+    if (typeof(hoursPast) === 'undefined') hoursPast = 10000;
 
     dbClient.connect(uriMongo, function(err, db){
         if (err){callback(err, []); db.close(); return;}

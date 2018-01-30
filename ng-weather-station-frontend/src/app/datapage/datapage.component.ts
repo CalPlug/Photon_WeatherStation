@@ -56,7 +56,6 @@ export class DatapageComponent implements OnInit {
             }
             this.categories = Object.values(this.cateogriesObj);
             if (typeof(onSuccess) !== 'undefined') onSuccess(this.categories);
-            // console.log(this.categories);
         });
     }
 
@@ -74,13 +73,15 @@ export class DatapageComponent implements OnInit {
                 this.getCategoryData(this.categories[i].name, data => this.populateSingle(this, data, catName));
             } else {
                 for(var j:number = 0; j<lenChildren; ++j){
-                    
-                    // if (!j){
-                    //     this.getCategoryData(this.categories[i].name + '_' + this.categories[i].children[j], data => this.populateSingle(this,data, catName));
-                    // } else {
+                    if (!j){
                         const childName = this.categories[i].children[j];
                         this.getCategoryData(this.categories[i].name + '_' + this.categories[i].children[j], data => this.populateMultiple(this, data, catName,childName ));
-                    // }
+                    } else {
+                        this.categoryData[this.categories[i].name] = [{
+                            series: [],
+                            name:this.categories[i].children[j]
+                        }];
+                    }
                 }
             }
         }
@@ -116,27 +117,47 @@ export class DatapageComponent implements OnInit {
         }
 
         if (!ref.categoryData.hasOwnProperty(categoryName)){
-            ref.categoryData[categoryName] = [{
-                series: arrData,
-                name: childName
-            }]
-        } else {
-            ref.categoryData[categoryName].push({
-                series: arrData,
-                name: childName
-            });
+            ref.categoryData[categoryName] = [];
         }
+            
+        ref.categoryData[categoryName].push({
+            series: arrData,
+            name: childName
+        });
+        
 
         ref.categoryData[categoryName] = [...ref.categoryData[categoryName]];
     }
 
-    dataSelect(event){
-        console.log(event);
+    dataSelect(event, mainCat){
+        // event = category or subcategory
+
         //TODO Toggle units for categories with multiple units.
+
+        //Only worry about subcategories
+        var index = this.cateogriesObj[mainCat].children.indexOf(event);
+        if (index>-1 ){
+            var lenChild = this.cateogriesObj[mainCat].children.length;
+            console.log(lenChild);
+            this.categoryData[mainCat] = [];
+            for(var j:number = 0; j<lenChild; ++j){
+                if (j == index){
+                    this.getCategoryData(mainCat + '_' + event, data => this.populateMultiple(this, data, mainCat,event ));
+                } else {
+                    this.categoryData[mainCat].push( {
+                        series: [],
+                        name:this.cateogriesObj[mainCat].children[j]
+                    } );
+                    this.categoryData[mainCat] = [...this.categoryData[mainCat]];
+                }
+            }
+
+            console.log(this.categoryData[mainCat]);
+        }
     }
 
     checkDefined(category){
-        return typeof(this.categoryData[category]) !== 'undefined'
+        return typeof(this.categoryData[category]) !== 'undefined';
     }
 
 }

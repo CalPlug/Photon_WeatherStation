@@ -13,7 +13,7 @@
                     [xAxis]="true"
                     [yAxis]="true"
                     [autoScale]="true"
-                    (select)="dataSelect($event)">
+                    (select)="dataSelect($event, category.name)">
                 </ngx-charts-line-chart>
         </div>
     </div>
