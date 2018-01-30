@@ -8,3 +8,11 @@
 .navbar{
     margin-bottom:0px;
 }
+
+span.legend-title-text {
+    display: none !important;
+}
+
+header.legend-title.ng-star-inserted::after {
+    content: "Unit(s)";
+}
