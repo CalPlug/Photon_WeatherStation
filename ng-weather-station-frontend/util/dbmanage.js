@@ -36,7 +36,7 @@ var queryCategories = function(callback){
 }
 
 var queryDataByCategory = function(category, callback, hoursPast){
-    if (typeof(hoursPast) === 'undefined') hoursPast = 10000;
+    if (typeof(hoursPast) === 'undefined') hoursPast = 24;
 
     dbClient.connect(uriMongo, function(err, db){
         if (err){callback(err, []); db.close(); return;}
@@ -51,9 +51,11 @@ var queryDataByCategory = function(category, callback, hoursPast){
         ).project(
             { [category]:1, utcTime:1, _id:0 }
         ).toArray(
-            callback
+            function(err, result){
+                callback(err, result);
+                db.close();
+            }
         );
-        db.close();
     });
 }
 

@@ -25,6 +25,7 @@ router.get('/categories', function(req, res){
 router.get('/data/:category', function(req, res){
 
     db.queryDataByCategory(req.params.category, function(err, result){
+        if (err)console.error(err);
         //Initial premise testing
         res.status(200).json(
             {

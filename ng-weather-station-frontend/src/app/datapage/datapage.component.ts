@@ -93,7 +93,7 @@ export class DatapageComponent implements OnInit {
         var arrData:Array<any> = [];
         for (var j:number = 0; j<data.length; ++j){
             arrData.push({
-                name: new Date(data[j].utcTime).toLocaleString(),
+                name: new Date(data[j].utcTime).toLocaleTimeString(),
                 value: data[j][categoryName]
             })
         }
@@ -111,7 +111,7 @@ export class DatapageComponent implements OnInit {
         var arrData:Array<any> = [];
         for (var j:number = 0; j<data.length; ++j){
             arrData.push({
-                name: new Date(data[j].utcTime).toLocaleString(),
+                name: new Date(data[j].utcTime).toLocaleTimeString(),
                 value: data[j][categoryName+"_"+childName]
             })
         }
