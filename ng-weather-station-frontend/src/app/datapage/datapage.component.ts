@@ -132,8 +132,6 @@ export class DatapageComponent implements OnInit {
     dataSelect(event, mainCat){
         // event = category or subcategory
 
-        //TODO Toggle units for categories with multiple units.
-
         //Only worry about subcategories
         var index = this.cateogriesObj[mainCat].children.indexOf(event);
         if (index>-1 ){
@@ -151,7 +149,6 @@ export class DatapageComponent implements OnInit {
                     this.categoryData[mainCat] = [...this.categoryData[mainCat]];
                 }
             }
-
             console.log(this.categoryData[mainCat]);
         }
     }
