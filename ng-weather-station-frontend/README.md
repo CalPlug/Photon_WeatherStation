@@ -6,6 +6,11 @@ This Node/Angular-based web application allows for the viewing of weather patter
 
 ## Running the application
 
+After cloning, navigate to this `ng-weather-station-frontend` directory, then run:
+```
+npm install
+```
+
 If angular-cli is not yet installed, run the command:
 ```
 npm install -g @angular/cli
