@@ -16,5 +16,8 @@
                     (select)="dataSelect($event, category.name)">
                 </ngx-charts-line-chart>
         </div>
+        <div *ngIf="!checkDefined(category.name)">
+            <h4>Loading...</h4>
+        </div>
     </div>
 </div>  
