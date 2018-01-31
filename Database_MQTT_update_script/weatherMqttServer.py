@@ -12,7 +12,7 @@ timer = time.time()
 connected_with_result_code_zero = 0
 #Improve readability of time
 
-def parse_msg(msg) -> tuple:
+def parse_msg(msg):
 	cleanResult = []
 
 	for i in msg:
@@ -25,7 +25,7 @@ def parse_msg(msg) -> tuple:
 	#print(cleanResult)
 	return tuple(cleanResult)
 
-def parse_geiger(geiger_str) -> tuple:
+def parse_geiger(geiger_str):
 	'''Where I stopped'''
 	
 	if(geiger_str[0] == 'C'):
