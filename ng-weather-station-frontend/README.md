@@ -11,6 +11,14 @@ If angular-cli is not yet installed, run the command:
 npm install -g @angular/cli
 ```
 
+Create a file in the `ng-weather-station-frontend` directory named `.env` and specify your MongoDB information in the following format:
+```
+MONGO_HOST=Your_Host
+MONGO_PORT=Your_Port_Default_27017
+MONGO_DB=Your_DB_name
+MONGO_COLL=Your_DB_Collection
+```
+
 Then, in the terminal, use the command:
 ```
 npm start
