@@ -23,7 +23,7 @@ MONGO_PORT=Your_Port_Default_27017
 MONGO_DB=Your_DB_name
 MONGO_COLL=Your_DB_Collection
 ```
-Additionally, if you want the application to run on a different port than 8080, specify it in `.env`.
+Additionally, if you want the application to run on a port other than 8080, specify it in `.env`.
 ```
 PORT=Your_port
 ```

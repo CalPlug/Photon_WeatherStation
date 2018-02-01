@@ -17,9 +17,12 @@ export class DatapageComponent implements OnInit {
     public view: any[] = [700, 400];
 
     categories:Category[] = [];
-    cateogriesObj= {};
-    public categoryData = {};
+    public cateogriesObj= {};
+    // public categoryData = {};
     dataready:boolean = false;
+
+    public dyOptions = {width: 'auto', animatedZooms: true, pointSize: 4}
+    public dyCategoryData = {};
 
     constructor( private http: HttpClient ) { 
     }
@@ -30,7 +33,7 @@ export class DatapageComponent implements OnInit {
     }
 
     ngAfterViewInit() {
-        console.log(this.categoryData);
+        // console.log(this.categoryData);
     }
 
     getCategories(onSuccess?) {
@@ -76,11 +79,7 @@ export class DatapageComponent implements OnInit {
                     if (!j){
                         const childName = this.categories[i].children[j];
                         this.getCategoryData(this.categories[i].name + '_' + this.categories[i].children[j], data => this.populateMultiple(this, data, catName,childName ));
-                    } else {
-                        this.categoryData[this.categories[i].name] = [{
-                            series: [],
-                            name:this.categories[i].children[j]
-                        }];
+                        break;
                     }
                 }
             }
@@ -90,71 +89,44 @@ export class DatapageComponent implements OnInit {
 
     private populateSingle(ref, data, categoryName){
         const lenData = data.length;
-        var arrData:Array<any> = [];
+        var dyArrData:Array<any> = [];
         for (var j:number = 0; j<data.length; ++j){
-            arrData.push({
-                name: new Date(data[j].utcTime).toLocaleTimeString(),
-                value: data[j][categoryName]
-            })
+
+            dyArrData.push(
+                [
+                    new Date(data[j].utcTime),
+                    parseInt(data[j][categoryName]) || 0
+                ]
+            )
         }
 
-        ref.categoryData[categoryName] = [{
-            series: arrData,
-            name:categoryName
-        }];
+        ref.dyCategoryData[categoryName] = dyArrData;
 
-        
     }
 
     private populateMultiple(ref, data, categoryName, childName){
         const lenData = data.length;
-        var arrData:Array<any> = [];
+        var dyArrData:Array<any> = [];
         for (var j:number = 0; j<data.length; ++j){
-            arrData.push({
-                name: new Date(data[j].utcTime).toLocaleTimeString(),
-                value: data[j][categoryName+"_"+childName]
-            })
-        }
-
-        if (!ref.categoryData.hasOwnProperty(categoryName)){
-            ref.categoryData[categoryName] = [];
+            dyArrData.push(
+                [
+                    new Date(data[j].utcTime),
+                    parseInt( data[j][categoryName+"_"+childName])
+                ]
+            )
         }
             
-        ref.categoryData[categoryName].push({
-            series: arrData,
-            name: childName
-        });
-        
+        ref.dyCategoryData[categoryName] = dyArrData;
 
-        ref.categoryData[categoryName] = [...ref.categoryData[categoryName]];
+        // console.log(ref.dyCategoryData);
     }
 
-    dataSelect(event, mainCat){
-        // event = category or subcategory
-
-        //Only worry about subcategories
-        var index = this.cateogriesObj[mainCat].children.indexOf(event);
-        if (index>-1 ){
-            var lenChild = this.cateogriesObj[mainCat].children.length;
-            console.log(lenChild);
-            this.categoryData[mainCat] = [];
-            for(var j:number = 0; j<lenChild; ++j){
-                if (j == index){
-                    this.getCategoryData(mainCat + '_' + event, data => this.populateMultiple(this, data, mainCat,event ));
-                } else {
-                    this.categoryData[mainCat].push( {
-                        series: [],
-                        name:this.cateogriesObj[mainCat].children[j]
-                    } );
-                    this.categoryData[mainCat] = [...this.categoryData[mainCat]];
-                }
-            }
-            console.log(this.categoryData[mainCat]);
-        }
+    chartSelect(mainCat, subCat){
+        this.getCategoryData(mainCat+ '_' + subCat, data => this.populateMultiple(this, data, mainCat,subCat )); 
     }
 
     checkDefined(category){
-        return typeof(this.categoryData[category]) !== 'undefined';
+        return typeof(this.dyCategoryData[category]) !== 'undefined';
     }
 
 }

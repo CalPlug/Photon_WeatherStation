@@ -11,6 +11,7 @@ import { DatapageComponent } from './datapage/datapage.component';
 
 import { NgxChartsModule } from '@swimlane/ngx-charts';
 import { ChartsModule } from 'ng2-charts';
+import { NgDygraphsModule } from 'ng-dygraphs';
 
 @NgModule({
   declarations: [
@@ -25,7 +26,8 @@ import { ChartsModule } from 'ng2-charts';
     HttpClientModule,
     NgxChartsModule,
     BrowserAnimationsModule,
-    ChartsModule
+    ChartsModule,
+    NgDygraphsModule
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -16,3 +16,10 @@ span.legend-title-text {
 header.legend-title.ng-star-inserted::after {
     content: "Unit(s)";
 }
+
+ul.chartSelection {
+    list-style: none;
+}
+ul.chartSelection li {
+    display: inline;
+}
