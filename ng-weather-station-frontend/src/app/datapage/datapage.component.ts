@@ -2,7 +2,6 @@ import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Http, Response, Headers, RequestOptions } from '@angular/http';
 import { Observable } from 'rxjs/Observable';
-import {NgxChartsModule} from '@swimlane/ngx-charts';
 import { Category } from '../category';
 
 @Component({
@@ -14,14 +13,11 @@ export class DatapageComponent implements OnInit {
 
     private apiUrl = 'api/';
 
-    public view: any[] = [700, 400];
-
     categories:Category[] = [];
     public cateogriesObj= {};
-    // public categoryData = {};
     dataready:boolean = false;
 
-    public dyOptions = {width: 'auto', animatedZooms: true, pointSize: 4}
+    public dyOptions = {width: 'auto', animatedZooms: true, pointSize: 4, labels:["Time", '']}
     public dyCategoryData = {};
 
     constructor( private http: HttpClient ) { 
@@ -95,7 +91,7 @@ export class DatapageComponent implements OnInit {
             dyArrData.push(
                 [
                     new Date(data[j].utcTime),
-                    parseInt(data[j][categoryName]) || 0
+                    parseFloat(data[j][categoryName]) || 0
                 ]
             )
         }
@@ -111,7 +107,7 @@ export class DatapageComponent implements OnInit {
             dyArrData.push(
                 [
                     new Date(data[j].utcTime),
-                    parseInt( data[j][categoryName+"_"+childName])
+                    parseFloat( data[j][categoryName+"_"+childName])
                 ]
             )
         }

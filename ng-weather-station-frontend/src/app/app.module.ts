@@ -9,8 +9,6 @@ import { AppRoutingModule } from './/app-routing.module';
 import { AboutComponent } from './about/about.component';
 import { DatapageComponent } from './datapage/datapage.component';
 
-import { NgxChartsModule } from '@swimlane/ngx-charts';
-import { ChartsModule } from 'ng2-charts';
 import { NgDygraphsModule } from 'ng-dygraphs';
 
 @NgModule({
@@ -24,9 +22,7 @@ import { NgDygraphsModule } from 'ng-dygraphs';
     BrowserModule,
     AppRoutingModule,
     HttpClientModule,
-    NgxChartsModule,
     BrowserAnimationsModule,
-    ChartsModule,
     NgDygraphsModule
   ],
   providers: [],

@@ -14,7 +14,7 @@
             </ul>
             <ng-dygraphs
                 [data]="dyCategoryData[category.name]"
-                [options]="dyOptions">
+                [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
             </ng-dygraphs>  
         </div>
         <div *ngIf="!checkDefined(category.name)">
