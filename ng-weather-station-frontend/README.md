@@ -32,3 +32,12 @@ Then, in the terminal, use the command:
 ```
 npm start
 ```
+
+
+## Defining categories
+
+The interface allows for the separation of data based on their categories and units of measurement. The category may be any valid field string (e.g., `Speed`). It is possible to group data of similar categories but of different units based on the field names in the MongoDB. This subcategorization can done by appending an underscore and the unit to the end of the category (e.g., `Temperature_F`). The user will be allowed to select which unit they would like to be displayed.
+
+Please attempt to keep these field names consistent.
+
+

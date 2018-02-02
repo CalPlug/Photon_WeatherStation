@@ -12,17 +12,18 @@ dbClient.connect(uriMongo, function(err, db){
 
 
 // Coded under the assumption that all documents will be consistent.
-// Based on the Python code, they will be!
+// 
 var queryCategories = function(callback){
 
     dbClient.connect(uriMongo, function(err, db){
         if (err){callback(err, []); db.close(); return;}
 
-        db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).findOne({}, (
+        //Find the latest document and get the fields from that.
+        db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find({}).sort({ _id: -1 }).limit(1).toArray(
             function (err, result){
                 if (err){callback(err, []); db.close(); return;}
 
-                var currKeys = Object.keys(result);
+                var currKeys = Object.keys(result[0]);
                 var index = currKeys.indexOf('utcTime')
                 if (index > -1){
                     currKeys.splice(index, 1);
@@ -31,7 +32,7 @@ var queryCategories = function(callback){
                 callback(null, currKeys);
                 db.close();
             }
-        ));
+        );
     });
 }
 
