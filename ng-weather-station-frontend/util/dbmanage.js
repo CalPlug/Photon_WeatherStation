@@ -19,7 +19,7 @@ var queryCategories = function(callback){
         if (err){callback(err, []); db.close(); return;}
 
         //Find the latest document and get the fields from that.
-        db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find({}).sort({ _id: -1 }).limit(1).toArray(
+        db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find({}).sort({ 'utcTime': -1 }).limit(1).toArray(
             function (err, result){
                 if (err){callback(err, []); db.close(); return;}
 
