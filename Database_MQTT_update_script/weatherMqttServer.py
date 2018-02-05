@@ -93,7 +93,6 @@ def on_message(client, userdata, msg):
 		'CPS':						weather_dict['CPS'],
 		'CPM':						weather_dict['CPM'],
 		'uSv/hr':					weather_dict['uSv/hr'],
-		'Speed':					weather_dict['Speed'].strip('\r\n'),
 		'RUNTIME_MIN':					weather_dict['RUNTIME_MIN']			
 		
 		}	
