@@ -59,7 +59,6 @@ def on_message(client, userdata, msg):
 		weather_dict['CPS'] = weather_msg[1]
 		weather_dict['CPM'] = weather_msg[3]
 		weather_dict['uSv/hr'] = weather_msg[5]
-		weather_dict['Speed'] = weather_msg[6]
 	else:
 		 
 		weather_dict[msg.topic[16:]] = weather_msg
@@ -84,7 +83,7 @@ def on_message(client, userdata, msg):
 		'Pressure_KPa': 				weather_dict['Pressure_KPa'],
 		'DewPoint_C': 					weather_dict['DewPoint_C'],
 		'DewPoint_F': 					weather_dict['DewPoint_F'],
-		'H2OPartialPressure_KPa':			weather_dict['H2OPartialPressure_KPa'],	 
+		'H2OPartialPressure_ KPa':			weather_dict['H2OPartialPressure_ KPa'],	 
 		'WindSpeed_MPH': 				weather_dict['WindSpeed_MPH'],		
 		'WindDirection_DEG':				weather_dict['WindDirection_DEG'],
 		'RainFall_INCHES_PerRepPeriod':			weather_dict['RainFall_INCHES_PerRepPeriod'],
