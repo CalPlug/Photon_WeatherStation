@@ -80,7 +80,7 @@ def on_message(client, userdata, msg):
 		'Temperature_F':				weather_dict['Temperature_F'],
 		'Temperature_C':	 			weather_dict['Temperature_C'],
 		'Humidity_RH': 	 				weather_dict['Humidity_RH'],
-		'Pressure_KPa': 				weather_dict['Pressure_KPa'],
+		'Pressure_ KPa': 				weather_dict['Pressure_ KPa'],
 		'DewPoint_C': 					weather_dict['DewPoint_C'],
 		'DewPoint_F': 					weather_dict['DewPoint_F'],
 		'H2OPartialPressure_ KPa':			weather_dict['H2OPartialPressure_ KPa'],	 
