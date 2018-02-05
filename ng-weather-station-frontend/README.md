@@ -41,3 +41,7 @@ The interface allows for the separation of data based on their categories and un
 Please attempt to keep these field names consistent.
 
 
+## Credits
+
+- dotenv by Scott Motte under the BSD 2-Clause "Simplified" License. (https://github.com/motdotla/dotenv)
+- ng-dygraphs by stepa under the MIT License. (https://github.com/mpx200/ng-dygraphs)
