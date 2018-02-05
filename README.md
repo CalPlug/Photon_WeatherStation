@@ -20,6 +20,8 @@ Mindy Saylors, EE Junior @ UC Irvine
 
 Hamed Ghafarshad, CS Senior @ UC Irvine
 
+Alex Ramirez, CSE Junior @ UC Irvine
+
 Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 California Institute for Telecommunications and Information Technology (Calit2), 2017
 University of California, Irvine
