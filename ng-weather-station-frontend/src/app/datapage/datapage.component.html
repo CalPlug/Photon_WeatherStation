@@ -7,9 +7,9 @@
         <h2>{{category.name}}</h2>
         <div style="overflow:hidden;" *ngIf="checkDefined(category.name)">
 
-            <ul *ngIf="cateogriesObj[category.name].children.length" class="chartSelection">
+            <ul *ngIf="category.children.length" class="chartSelection">
                 Select Unit(s): 
-                <li *ngFor="let subcat of cateogriesObj[category.name].children; let idx = index;">
+                <li *ngFor="let subcat of category.children; let idx = index;">
                     <input type="radio" name="subCat{{category.name}}" [checked]="(idx === 0)" [value]="subcat" (change)="chartSelect(category.name, subcat)"> {{subcat}}
                 </li>
             </ul>
