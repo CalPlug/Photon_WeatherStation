@@ -6,7 +6,7 @@
     <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
         <h2>{{category.name}}</h2>
         <div style="overflow:hidden;" *ngIf="checkDefined(category.name)">
-
+            <span>Most Recent Value: {{ mostRecent[category.name] }}</span>
             <ul *ngIf="category.children.length" class="chartSelection">
                 Select Unit(s): 
                 <li *ngFor="let subcat of category.children; let idx = index;">

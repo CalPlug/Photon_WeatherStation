@@ -20,6 +20,8 @@ export class DatapageComponent implements OnInit {
     public dyOptions = {width: 'auto', animatedZooms: true, pointSize: 4, labels:["Time", '']}
     public dyCategoryData = {};
 
+    public mostRecent = {};
+
     constructor( private http: HttpClient ) { 
     }
 
@@ -94,6 +96,7 @@ export class DatapageComponent implements OnInit {
                     parseFloat(data[j][categoryName]) || 0
                 ]
             )
+            ref.mostRecent[categoryName] = parseFloat(data[j][categoryName]) || 0;
         }
 
         ref.dyCategoryData[categoryName] = dyArrData;
@@ -110,6 +113,7 @@ export class DatapageComponent implements OnInit {
                     parseFloat( data[j][categoryName+"_"+childName])
                 ]
             )
+            ref.mostRecent[categoryName] = parseFloat(data[j][categoryName+"_"+childName]) || 0;
         }
             
         ref.dyCategoryData[categoryName] = dyArrData;
