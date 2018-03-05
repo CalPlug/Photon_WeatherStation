@@ -6,14 +6,15 @@ This Node/Angular-based web application allows for the viewing of weather patter
 
 ## Running the application
 
-After cloning, navigate to this `ng-weather-station-frontend` directory, then run:
-```
-npm install
-```
-
 If angular-cli is not yet installed, run the command:
 ```
 npm install -g @angular/cli
+```
+
+
+After cloning, navigate to this `ng-weather-station-frontend` directory, then run:
+```
+npm install
 ```
 
 Create a file in the `ng-weather-station-frontend` directory named `.env` and specify your MongoDB information in the following format:
