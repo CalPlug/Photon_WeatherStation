@@ -16,7 +16,7 @@ dbClient.connect(uriMongo, function(err, db){
 var queryCategories = function(callback){
 
     dbClient.connect(uriMongo, function(err, db){
-        if (err){callback(err, []); db.close(); return;}
+        if (err){callback(err, []); return;}
 
         //Find the latest document and get the fields from that.
         db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find({}).sort({ 'utcTime': -1 }).limit(1).toArray(
@@ -40,7 +40,7 @@ var queryDataByCategory = function(category, callback, hoursPast){
     if (typeof(hoursPast) === 'undefined') hoursPast = 24;
 
     dbClient.connect(uriMongo, function(err, db){
-        if (err){callback(err, []); db.close(); return;}
+        if (err){callback(err, []); return;}
         
         var date = new Date(new Date().getTime() - (hoursPast * 60 * 60 * 1000));
         db.db(process.env.MONGO_DB).collection(process.env.MONGO_COLL).find(
