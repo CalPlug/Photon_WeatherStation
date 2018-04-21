@@ -13,6 +13,19 @@ export class DatapageComponent implements OnInit {
 
     private apiUrl = 'api/';
 
+    public checked:boolean = false;
+    public mark:boolean = true;
+   
+    public subname = "";
+    public subindex = 0;
+    
+    public subcheck:Array<boolean> = [];
+    public subcate:Array<String> = [
+        "WindDirection","Pressure","RUNTIME","Humidity","RainFall","DewPoint","Temperature","LightVIS","H2OPartialPressure","CPM","uSv/hr","WindSpeed","LightIR","LightUV","CPS"
+    ];
+
+
+
     categories:Category[] = [];
     public cateogriesObj= {};
     dataready:boolean = false;
