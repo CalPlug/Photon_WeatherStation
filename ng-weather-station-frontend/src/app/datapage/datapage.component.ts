@@ -12,6 +12,7 @@ import { Category } from '../category';
 export class DatapageComponent implements OnInit {
 
     private apiUrl = 'api/';
+    name = ["sam", "jason","Emily"];
 
     public checked:boolean = false;
     public mark:boolean = true;
@@ -23,10 +24,8 @@ export class DatapageComponent implements OnInit {
     public subcate:Array<String> = [
         "WindDirection","Pressure","RUNTIME","Humidity","RainFall","DewPoint","Temperature","LightVIS","H2OPartialPressure","CPM","uSv/hr","WindSpeed","LightIR","LightUV","CPS"
     ];
-
-
-
     categories:Category[] = [];
+    
     public cateogriesObj= {};
     dataready:boolean = false;
 
@@ -45,6 +44,7 @@ export class DatapageComponent implements OnInit {
         // console.log(this.categoryData);
     }
 
+    // Here is where they populate up the categories
     getCategories(onSuccess?) {
         this.http.get(this.apiUrl+'categories').subscribe(data => {
             var catData:string[] = data['categories'];

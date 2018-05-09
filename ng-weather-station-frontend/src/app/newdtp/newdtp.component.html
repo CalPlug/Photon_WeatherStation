@@ -1,0 +1,373 @@
+<h1>
+    Data view
+</h1>
+<h5>View weather data from the past 24 hours.</h5>
+<!--these two is for show function-->
+
+
+<div id="allCats" >
+    <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
+        <font size="1" color="red">{{category.name}}</font>
+        <div style="overflow:hidden;" *ngIf="checkDefined(category.name)">
+
+            <ul *ngIf="cateogriesObj[category.name].children.length" class="chartSelection">
+                Select Unit(s): 
+                <li *ngFor="let subcat of cateogriesObj[category.name].children; let idx = index;">
+                    <input type="radio" name="subCat{{category.name}}" [checked]="(idx === 0)" [value]="subcat" (change)="chartSelect(category.name, subcat)"> {{subcat}}
+                </li>
+            </ul>
+            
+            
+            <div>
+                    
+                    <div *ngIf = 'category.name == subcate[0]'>
+                    Image:<button class="button" type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[0] = true">Show</button>
+                    <button type="button" (click)="subcheck[0] = false">Hide</button>
+
+                        
+                    <div 
+                    *ngIf=' subcheck[0] && checked'
+                    class="ops">
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                    <div *ngIf = 'category.name == subcate[1]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[1] = true">Show</button>
+                    <button type="button" (click)="subcheck[1] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[1] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                    
+                <div *ngIf = 'category.name == subcate[2]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[2] = true">Show</button>
+                    <button type="button" (click)="subcheck[2] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[2] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[3]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[3] = true">Show</button>
+                    <button type="button" (click)="subcheck[3] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[3] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[4]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[4] = true">Show</button>
+                    <button type="button" (click)="subcheck[4] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[4] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[5]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[5] = true">Show</button>
+                    <button type="button" (click)="subcheck[5] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[5] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[6]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[6] = true">Show</button>
+                    <button type="button" (click)="subcheck[6] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[6] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[7]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[7] = true">Show</button>
+                    <button type="button" (click)="subcheck[7] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[7] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[8]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[8] = true">Show</button>
+                    <button type="button" (click)="subcheck[8] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[8] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[9]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[9] = true">Show</button>
+                    <button type="button" (click)="subcheck[9] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[9] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[10]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[10] = true">Show</button>
+                    <button type="button" (click)="subcheck[10] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[10] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[11]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[11] = true">Show</button>
+                    <button type="button" (click)="subcheck[11] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[11] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[12]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[12] = true">Show</button>
+                    <button type="button" (click)="subcheck[12] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[12] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[13]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[13] = true">Show</button>
+                    <button type="button" (click)="subcheck[13] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[13] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+                <div *ngIf = 'category.name == subcate[14]'>
+                    Image:<button type="button" aria-label="Toggle ngShow"
+                                (click)="subname=category.name" 
+                                (click)="checked = true" 
+                                
+                                (click)="subcheck[14] = true">Show</button>
+                    <button type="button" (click)="subcheck[14] = false">Hide</button>
+
+                        
+                    <div  *ngIf=' subcheck[14] && checked'>
+                    {{subcate[category.name]}}
+                    <ng-dygraphs
+                        [data]="dyCategoryData[category.name]"
+                        [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
+                    
+                    </ng-dygraphs>
+                        <div *ngIf="!checkDefined(category.name)">
+                            <h4>Loading...</h4>
+                        </div>
+                        </div>
+                    </div>
+                
+
+                
+                    
+                <br/>
+
+        
+
+
+                
+                    
+                    
+            </div>
+            
+            
+            
+        </div>
+       
+    </div>
+</div>  

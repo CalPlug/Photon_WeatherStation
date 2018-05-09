@@ -1,0 +1,28 @@
+.box{
+    width:100px;
+    height:100px;
+}
+.separate{
+    position: relative;
+    border: none;
+    float: left;
+}
+.ops{
+    border:none;
+    position: relative;
+    
+    left:30px;
+}
+.button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 22px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: medium;
+    margin: 1px 2px;
+    cursor: pointer;
+    left: 30px;
+}

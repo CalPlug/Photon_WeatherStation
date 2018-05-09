@@ -1,3 +1,33 @@
 div.catView{
-    border-bottom: rgb(102, 102, 102) 1px solid
+    float:right;
+    right: 20px;
+    width: 180px;
+    height: 100px;
+    border: 3px solid #73AD21;
+    padding: 10px;
 }
+.button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 22px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: medium;
+    margin: 1px 2px;
+    cursor: pointer;
+}
+.ops{
+    border:none;
+    position: relative;
+    
+    left:30px;
+}
+.separate{
+    align-self: auto;
+    position: relative;
+    border: none;
+    float: left;
+}
+
