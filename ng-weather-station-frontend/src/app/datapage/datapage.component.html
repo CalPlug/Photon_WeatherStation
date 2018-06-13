@@ -24,11 +24,9 @@
 
                     <div *ngIf="WindRelative == category.name" class="display">
                         <ssmap></ssmap>
-                        
                     </div>
 
-                    <div [hidden]="WindRelative == category.name">
-                            
+                    <div [hidden]="WindRelative == category.name">     
                             <ng-dygraphs
                             [data]="dyCategoryData[category.name]"
                             [options]="{
