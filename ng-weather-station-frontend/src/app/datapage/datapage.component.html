@@ -5,26 +5,53 @@
 <!--these two is for show function-->
 
 
-<div id="allCats" >
-    <div class="separate">
-        <ssmap></ssmap>
-    </div>
-    <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
-        <font size="1" color="red" >{{category.name}}</font>
-        <div style="overflow:hidden;" *ngIf="checkDefined(category.name)">
 
-            <ul *ngIf="cateogriesObj[category.name].children.length" class="chartSelection">
-                Select Unit(s): 
-                <li *ngFor="let subcat of cateogriesObj[category.name].children; let idx = index;">
-                    <input type="radio" name="subCat{{category.name}}" [checked]="(idx === 0)" [value]="subcat" (change)="chartSelect(category.name, subcat)"> {{subcat}}
-                </li>
-            </ul>
-            
-            
-            
-            
-            
+<div id="allCats">
+    <div class="Hori">
+
+    <div class="Cateblock">
+
+        <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
+        <a (click)="GetCatename(category.name)" (click)="newMessage()" routerLink="/graph" size="1" color="red">{{category.name}}</a>
+            <div style="overflow:hidden;" *ngIf="checkDefined(category.name)">
+                <div class="indata">
+                    <div *ngIf="cateogriesObj[category.name].children.length">
+                        <span>{{ mostRecent[category.name] }}</span>
+                        {{cateogriesObj[category.name].children[0]}}
+                    </div>  
+
+                   
+
+                    <div *ngIf="WindRelative == category.name" class="display">
+                        <ssmap></ssmap>
+                        
+                    </div>
+
+                    <div [hidden]="WindRelative == category.name">
+                            
+                            <ng-dygraphs
+                            [data]="dyCategoryData[category.name]"
+                            [options]="{
+                            width:'180',
+                            height: '40',
+                            legend:'never',
+                            animatedZooms: false
+                            }">
+                          </ng-dygraphs>    
+                    </div>
+
+               
+
+                </div>
+
+
+            </div>
         </div>
-       
+
+        
+    
     </div>
-</div>  
+    
+
+</div> 
+</div> 

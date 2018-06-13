@@ -1,8 +1,11 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { DataService } from './../data.service';
+import { Category } from './../category';
+import { NewdtpComponent } from './../newdtp/newdtp.component';
+import { Component, OnInit, AfterViewInit, Input, HostListener} from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Http, Response, Headers, RequestOptions } from '@angular/http';
 import { Observable } from 'rxjs/Observable';
-import { Category } from '../category';
+
 
 @Component({
     selector: 'app-datapage',
@@ -11,40 +14,48 @@ import { Category } from '../category';
 })
 export class DatapageComponent implements OnInit {
 
-    private apiUrl = 'api/';
-    name = ["sam", "jason","Emily"];
+    message_test = "hello world";
 
-    public checked:boolean = false;
-    public mark:boolean = true;
-   
-    public subname = "";
-    public subindex = 0;
-    
-    public subcheck:Array<boolean> = [];
-    public subcate:Array<String> = [
-        "WindDirection","Pressure","RUNTIME","Humidity","RainFall","DewPoint","Temperature","LightVIS","H2OPartialPressure","CPM","uSv/hr","WindSpeed","LightIR","LightUV","CPS"
-    ];
+    private apiUrl = 'api/';
+
     categories:Category[] = [];
-    
     public cateogriesObj= {};
     dataready:boolean = false;
 
     public dyOptions = {width: 'auto', animatedZooms: true, pointSize: 4, labels:["Time", '']}
     public dyCategoryData = {};
 
-    constructor( private http: HttpClient ) { 
+    public mostRecent = {};
+
+    public Cname:any = "";
+    public WindRelative:string = "WindDirection";
+
+    
+    //data service
+    message:string;
+
+
+
+    GetCatename(name){
+        this.Cname = name;
+    }
+
+    newMessage(){
+        this.data.changeMessage(this.Cname);
+    }
+
+    constructor( private http: HttpClient, private data:DataService) { 
     }
 
     ngOnInit() {
         this.getCategories(data => this.populateCategories(data));
-        
+        this.data.currentMessage.subscribe(message => this.message = message);
     }
 
     ngAfterViewInit() {
         // console.log(this.categoryData);
     }
 
-    // Here is where they populate up the categories
     getCategories(onSuccess?) {
         this.http.get(this.apiUrl+'categories').subscribe(data => {
             var catData:string[] = data['categories'];
@@ -107,6 +118,7 @@ export class DatapageComponent implements OnInit {
                     parseFloat(data[j][categoryName]) || 0
                 ]
             )
+            ref.mostRecent[categoryName] = parseFloat(data[j][categoryName]) || 0;
         }
 
         ref.dyCategoryData[categoryName] = dyArrData;
@@ -123,6 +135,7 @@ export class DatapageComponent implements OnInit {
                     parseFloat( data[j][categoryName+"_"+childName])
                 ]
             )
+            ref.mostRecent[categoryName] = parseFloat(data[j][categoryName+"_"+childName]) || 0;
         }
             
         ref.dyCategoryData[categoryName] = dyArrData;
@@ -139,3 +152,4 @@ export class DatapageComponent implements OnInit {
     }
 
 }
+

@@ -1,0 +1,23 @@
+
+<div>
+
+
+
+  <div *ngIf="trigger">
+  
+        <h1>{{TheTile}}</h1>
+        <div>
+        <ng-dygraphs
+        [data]="dyCategoryData[TheTile]"
+        [options]="{
+        animatedZooms: true, 
+        pointSize: 4, 
+        width: 'auto', 
+        labels:['Time', TheTile], 
+        xlabel:'Time', ylabel:TheTile
+        }">
+      </ng-dygraphs>  
+      </div>
+    </div>
+   
+  </div>

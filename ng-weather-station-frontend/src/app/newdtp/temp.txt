@@ -1,23 +1,12 @@
-  <div class="separate">
-    <div class="ops">
-    <div *ngFor="let category of categories" id="cat{{category.name}}" class="catView">
-    <h2>{{category.name}}</h2>
-    
-        <ng-dygraphs
-            [data]="dyCategoryData[category.name]"
-            [options]="{width: 'auto', animatedZooms: true, pointSize: 4, labels:['Time', category.name], xlabel:'Time', ylabel:category.name}">
-        </ng-dygraphs>  
-    
-    <div *ngIf="!checkDefined(category.name)">
-        <h4>Loading...</h4>
-    </div>
-    </div>
-  </div>
-
-
-
-
-
-
-<button class="button" type="button" (click)="clicked = true" 
-              (click)="nextCate()">
+                <div>
+                <ng-dygraphs
+                ($event)="Winddirsp()"
+                [data]="dyCategoryData[category.name]"
+                [options]="{
+                width:'auto',
+                height: 'auto',
+                animatedZooms: false, 
+                pointSize: 2
+                }">
+              </ng-dygraphs>    
+            </div>

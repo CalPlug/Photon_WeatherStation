@@ -2,10 +2,31 @@ div.catView{
     float:right;
     right: 20px;
     width: 180px;
-    height: 100px;
+    height: 150px;
     border: 3px solid #73AD21;
+    border-style: outset;
     padding: 10px;
+    min-block-size: 50px;
 }
+
+.Cateblock{
+    float: right;
+    max-width: 800px;
+    max-height: 600px;
+}
+
+.indata{
+    float: left;
+}
+
+.units{
+    size: 1px;
+    font-size: smaller;
+    align-content: flex-start;
+    float: left;
+    
+}
+
 .button {
     background-color: #4CAF50;
     border: none;
@@ -30,4 +51,22 @@ div.catView{
     border: none;
     float: left;
 }
+
+.display{
+    float:left;
+    max-width: 200px;
+    max-height: 180px;
+}
+
+.Hori{
+    align-self: horizontal;
+    position: relative;
+}
+
+.sizing{
+    float: right;
+    align-content: flex-start;
+}
+
+
 

@@ -1,125 +1,23 @@
-import { Component, OnInit, AfterViewInit, HostBinding, Input } from '@angular/core';
+import { DataService } from './../data.service';
+import { Component, OnInit, Input } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Http, Response, Headers, RequestOptions } from '@angular/http';
 import { Observable } from 'rxjs/Observable';
 import { Category } from '../category';
-import { BehaviorSubject } from 'rxjs/BehaviorSubject';
+import { Message } from '@angular/compiler/src/i18n/i18n_ast';
 
 @Component({
-  selector: 'ssmap',
-  templateUrl: './newdtp.component.html',
-  styleUrls: ['./newdtp.component.css']
+  selector: 'app-datagraph',
+  templateUrl: './datagraph.component.html',
+  styleUrls: ['./datagraph.component.css']
 })
-export class NewdtpComponent implements OnInit {
-  
-  
-  display:boolean = false;
-  Cindex:number = 0;
-  Wdirct:number = 0;
-  buttondis:string="show image";
+export class DatagraphComponent implements OnInit {
 
-  @Input() message_test: string;
+  trigger:boolean = false;
 
-
-  //wind direction and wind speed is over here
-    // Radar
-    Cleardata=[0,0,0,0,0,0,0,0];
-    public radarChartLabels:string[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W','NW'];
+    message:string;
  
-    public radarChartData:any = [
-      {data: [0,0,0,0,0,0,10,0],label:null},
-      
-  
-      
-    ];
-    public radarChartType:string = 'radar';
-   
-    // events
-    public chartClicked(e:any):void {
-      console.log(e);
-    }
-   
-    public chartHovered(e:any):void {
-      console.log(e);
-    }
-  
-// end of radar
 
-  public Winddirsp(){
-    let degree = this.mostRecent["WindDirection"];
-    let speed = this.mostRecent["WindSpeed"];
-    let minor_speed = speed-5;
-
-    
-    
-    if (degree==0 || degree==360){
-      this.radarChartData = [      
-        {
-          data: [speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-    }else if(degree>0 && degree<90){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree==90){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree>90 && degree<180){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,minor_speed,speed,minor_speed,minor_speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree==180){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,minor_speed,minor_speed,speed,minor_speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree>180 && degree<270){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,speed,minor_speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree==270){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,speed,minor_speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }else if(degree>270){
-
-      this.radarChartData = [      
-        {
-          data: [minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,minor_speed,speed], label: 'Wind direction & speed'
-        }
-      ];
-
-    }
-
-
-
-
-  }
 
 
 
@@ -138,7 +36,8 @@ export class NewdtpComponent implements OnInit {
 
     
 
-  constructor(private http : HttpClient) { 
+  constructor(private http : HttpClient, private data:DataService) { 
+
     
   }
 
@@ -148,7 +47,7 @@ export class NewdtpComponent implements OnInit {
 
   ngOnInit() {
       this.getCategories(data => this.populateCategories(data));
-      
+      this.data.currentMessage.subscribe(message => this.message = message);
   }
 
   ngAfterViewInit() {
@@ -204,8 +103,8 @@ export class NewdtpComponent implements OnInit {
           }
       }
       this.dataready = true;
-      this.display = true;
-      
+      this.trigger = true;
+      this.TheTile = this.message;
   }
 
   private populateSingle(ref, data, categoryName){
@@ -253,3 +152,4 @@ export class NewdtpComponent implements OnInit {
   }
 
 }
+

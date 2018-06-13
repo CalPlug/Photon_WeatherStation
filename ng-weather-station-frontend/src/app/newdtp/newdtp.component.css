@@ -1,17 +1,8 @@
-.box{
-    width:100px;
-    height:100px;
-}
-.separate{
-    position: relative;
-    border: none;
+
+.radar{
     float: left;
-}
-.ops{
-    border:none;
-    position: relative;
-    
-    left:30px;
+    max-width: 500px;
+    max-height: 500px;
 }
 .button {
     background-color: #4CAF50;
@@ -25,4 +16,15 @@
     margin: 1px 2px;
     cursor: pointer;
     left: 30px;
+    size: 60px;
+}
+
+.data_align{
+    float:left;
+    *display: inline; 
+    zoom: 1; 
+    vertical-align: top; 
+    glyph-orientation-horizontal: initial;
+    font-size: 12px;
+    
 }
