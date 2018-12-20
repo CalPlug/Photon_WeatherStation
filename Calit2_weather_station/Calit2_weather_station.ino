@@ -11,10 +11,12 @@
 //  with porting to Photon by Rickkas7: https://github.com/rickkas7/TCA9548A-RK  
 // The weather shild base project was developed by N. Seidle of SparkFun.
 //brownout protection by JVanier: https://community.particle.io/t/eeprom-persistence-issue/16514/39
-//
+//  Example written and tested on Particle Photon
 // Authors:
 //	- Sid Kasat, CS Junior @ UC Irvine
 //	- Mindy Saylors, EE Junior @ UC Irvine
+//      -M. Klopfer
+//Version 1.7, 12/19/2018 updated
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
 //California Institute for Telecommunications and Information Technology (Calit2), 2017
@@ -57,6 +59,7 @@ const unsigned int sensorCapturePeriod = 100; //(ms) 0.1 second  // Each time we
 const unsigned int publishPeriod = 10000; //(ms) 10 seconds, 
 unsigned int timeNextPublish; // Each time we loop through the main loop, we check to see if it's time to publish the data we've collected, update this value
 unsigned int timeNextSensorReading = 100; //(ms) 0.1 second
+int ConnectTrysBeforeReset = 100; //number of times to try a connect to MQTT before restiing Photon.  Warning:  This is a kludge to force a reset if no MQTT connection works, set to -1 to disable
 
 //Geiger Counter reading management
 unsigned int lastmillis = millis (); //used to manage reporting of Geiger Counter values
@@ -81,6 +84,8 @@ float partialpressureH2Osat = 0.0;
 float dewpointC = 0.0;
 float dewpointF = 0.0;
 unsigned int pressurePascalsReadingCount = 0;
+int conntectattempt=0;
+
 
 //Rain Sensor
 volatile unsigned int rainEventCount;
@@ -223,12 +228,12 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("m12.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
+ MQTT client("mXXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("xxxxxserverxxxxx", "xxxxuserxxxx", "xxxxpwdxxxx");
+     client.connect("mXXX.cloudmqtt.com", "USER", "PASS");
     // publish/subscribe
      if (client.isConnected()) 
      {
@@ -240,15 +245,46 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
 
  void publishToMQTT(float tempF,float tempC,float humidityRH,float pressureKPa,float rainInches,float windMPH,float windDegrees, float UV, float vis, float IR) //make sure to do anclient connected check before calling!
  {
-    // To write multiple fields for MQTT Posting
- 	char payload[255];
+    char payload[255];  // To write multiple fields for MQTT Posting
+ 	
  	//Derivative Calculations for partial pressure and dewpoint from final values to be reported
-        float dewpointC = dewpoint(tempC,humidityRH);
-        float dewpointF = (dewpointC * 1.8) + 32;
-        float partialpressureH2O = vaporpressureH2O(dewpointC);
-        //float partialpressureH2Osat = vaporpressureH2Osat(tempC);  //extra function that is not required, calculation of vapor pressure of water at the current temperature
-        //float rh_calc= (partialpressureH2O/partialpressureH2Osat)*100;  //calculate RH from e and es, extra function that is redundant, back calculation check of RH value
+    float dewpointC = dewpoint(tempC,humidityRH);
+    float dewpointF = (dewpointC * 1.8) + 32;
+    float partialpressureH2O = vaporpressureH2O(dewpointC);
 
+    //Calibration Corrections for Temp, Pressure, Humidity
+   
+
+    //Simple Linear RH Calibration
+    //Careful!  RH is calculated by temp in the sensor, this relationship may be non linar with respect to calibration performed here!  Alternate approach is shown above, use one or the other!
+    float RHGain = 1.0; //1.1493, previously
+    float RHOffset = 0;  //9.7717, previously
+    humidityRH = humidityRH*RHGain + RHOffset;
+    
+          /*
+    //Advanced RH Calibration - Stripping RH down to components then apply calibration to PP H2O values - use raw sensor values to separate, perform this task before applying gain and offset for temp vals, alternate way of correcting RH value
+    float PPGain = 1;
+    float PPOffset = 0;
+    float partialpressureH2Osat = vaporpressureH2Osat(tempC);  //calculation of vapor pressure of water at the current temperature
+    partialpressureH2O = partialpressureH2O*PPGain + PPOffset; //apply linear calibration to the PP value (denoted e), this will correct for a linear error in sensor measurement prior to the calculation within the sensor for RH
+    humidityRH = (partialpressureH2O/partialpressureH2Osat)*100;  //back calculate RH from e and es, replace RH value with this calibrated update value
+    */
+   
+    //Now that the RH calculations are done, update temperature values with calibration 
+    float TCGain = 1;
+    float TCOffset = 0;
+    tempC = tempC*TCGain + TCOffset;
+
+    float TFGain = 1;
+    float TFOffset = 0;
+    tempF = tempF*TFGain + TFOffset;
+    
+    //Assume linear pressure calibration
+    float PresGain = 1;
+    float PresOffset = 0;
+    pressureKPa = pressureKPa*PresGain + PresOffset;
+    
+    //Report updated values to MQTT
  	snprintf(payload, sizeof(payload), "%0.2f", tempF);
  	client.publish("Weather_Station/Temperature_F", payload);
 	
@@ -337,7 +373,6 @@ void captureTempHumidityPressure()
   // and a count of the number of observations
     // Measure Temperature in F from the HTU21D or Si7021
   float tempF = sensor.getTempF();
-  
   //If the result is reasonable, add it to the running mean
   if(tempF > -50 && tempF < 150)
   {
@@ -346,25 +381,23 @@ void captureTempHumidityPressure()
       tempFReadingCount++;
   }
   
+  delay (10);  //delay before reading humidity
   
  // Measure Relative Humidity from the HTU21D or Si7021
  float humidityRH = sensor.getRH();
     // Linear Correction for humidity sensor (to fix calibration issue)
-    float gain=1.4;    //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
-    float offset = 35;  //HTU21D Sensor failure was experienced, this set of calibration factors seemed to make the data roughly "normal" - calibration done with hygrometer, this is atypical use!  No need for linear calibration if sensor is working properly
-    humidityRH = humidityRH*gain + offset;
-    //
   //If the result is reasonable, add it to the running mean
-  if(humidityRH > 0 && humidityRH < 105)   //the lower bound should be 0, but something funny is going on, so linear correction done before this step....
+  if(humidityRH > 0 && humidityRH < 105)   //the lower bound should be 0, validity checked after linear correction
   {
       // Add the observation to the running sum, and increment the number of observations
       humidityRHTotal += humidityRH;
       humidityRHReadingCount++;
   }
   
-   // Measure Temperature in C from the HTU21D or Si7021
-  float tempC = sensor.getTemp();
+  delay (10);  //delay before reading Temp again (yes totally redundant versus just converting)
   
+   // Measure Temperature in C from the HTU21D or Si7021
+  float tempC = sensor.getTemp(); //yes you can convert, yes, reading the sensor again is totally redundant
   //If the result is reasonable, add it to the running mean
   if(tempC > -65 && tempC < 65) 
   {
@@ -470,7 +503,7 @@ void initializeRainGauge()
   //pinMode(RainPin, INPUT_PULLUP);
   rainEventCount = 0;
   lastRainEvent = 0;
-  //attachInterrupt(RainPin, handleRainEvent, FALLING);
+  attachInterrupt(RainPin, handleRainEvent, FALLING);
   return;
 }
  
@@ -676,12 +709,18 @@ void captureGeigerValues()
 	    while (i<arrlen && Serial1.available())
 	    {
 	        char c= Serial1.read();
+	        
 		    test[i]=c;
 	        i++;
 		}
+
         	if (i>30 && (test[0]=='C' || test[0]=='*')) //check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
         	{
-        	    if (client.isConnected() && (lastmillis + geigerloopdelay < millis())) //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
+        	   // 		client.publish("Weather_Station/GEIGER_OUTPUT_TEST",test); //Prints successfully
+        	   
+        	   //                          vvv There is a race condition here. test is published successfully w/out the time check
+        	   //                          vvv                                 test gets overwritten w/ the check
+        	    if (client.isConnected() /*&& (lastmillis + geigerloopdelay < millis())*/) //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
                     {
            		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
         	            char payload[255];
@@ -970,7 +1009,7 @@ float getUVReadings()
     lightUVTotal = 0.0;
     lightUVReadingCount = 0;
     
-	return UVindex/100; //return UVindex/100
+	return UVindex; //return UVindex (do the /100 for the returned val)
 }
 
 
@@ -1042,16 +1081,24 @@ uint8_t SI1145i2cwriteParam(uint8_t p, uint8_t v)
 //*******Main Loop**********
 void loop() 
 {
-    // Capture any sensors that need to be polled (temp, humidity, pressure, wind vane)
+    if (millis() > lastmillis)
+        {
+            lastmillis = millis(); //rollover checker, make sure this variable monotonically increases
+        }
+        
+    // Capture any sensors that need to be polled (temp, humidity, pressure, wind vane), this is where the reads happen that will be averaged
     if(timeNextSensorReading <= millis()) 
     {
         mux.setChannel(0);  //Switch to Main I2C Bus
-            delay (10);
-            getIR(); //Read IR value from SI1145 UV/VIS/IR Sensor
-            getVis(); //Read visible light value from SI1145 UV/VIS/IR Sensor
+            delay (5);
             getUV(); //Read UV Index value from SI1145 UV/VIS/IR Sensor
+            delay (1);
+            getIR(); //Read IR value from SI1145 UV/VIS/IR Sensor
+            delay (1);
+            getVis(); //Read visible light value from SI1145 UV/VIS/IR Sensor
+            delay (1);
         mux.setChannel(1);  //Switch to Main I2C Bus
-           delay(10);
+           delay(5);
             captureTempHumidityPressure();
             captureWindVane();
         // Schedule the next sensor reading
@@ -1093,19 +1140,32 @@ void loop()
             float windMPH = getAndResetAnemometerMPH(&gustMPH);
             float windDegrees = getAndResetWindVaneDegrees();
         //Serial.println("After Wind");
-		    float UVIndex = getUVReadings(); //return averaged values for UV
+		    float UVIndex = getUVReadings(); //return averaged values for UV (remember to div by 100 for index!)
 		    float vis = getVisReadings(); //return averaged values for Vis
 		    float IR= getIRReadings(); //return averaged values for IR
 		    
         if (client.isConnected())
             {
-    		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex,vis,IR);
+    		publishToMQTT(tempF, tempC, humidityRH, pressureKPa, rainInches, windMPH, windDegrees,UVIndex/100,vis,IR);
+    		client.loop(); //Check with loop active, refresh connection after post,keep MQTT connection alive
     		//Serial.println("Just Published to MQTT");  //Serial DEBUG message
             }
          else
              {   
               Particle.publish(String::format("Client Publish Fail: Now %f Min. Runtime", (millis())/60000)); //notify of connection failure to MQTT Broker (provided general connectivity)
-              client.connect("xxxxxSERVERxxxxxxxx", "xxxxuserxxxxx", "xxxxxxpasswordxxxxx"); //Try to reconnect for next round
+              client.connect("XXXX.cloudmqtt.com", "USER", "PASS"); //Try to reconnect for next round
+              
+              delay (500);
+              if (client.isConnected())
+                {
+                  conntectattempt=0; //connection reestablished, reset the counter
+                }
+              conntectattempt++;
+              if (ConnectTrysBeforeReset > 20)  //resetsystem after 20 failed sequential attempts to connect
+                  {
+                      //counts resets when system resets, they will accrew
+                     System.reset(); //reset the Photon
+                  }
              }
          
         
@@ -1118,7 +1178,5 @@ void loop()
           timeNextPublish =  millis() + publishPeriod;  //millis() roll over protection
         }
 
-// The rain and wind speed sensors use interrupts, and so data is collected "in the background"
-
-    delay(2); //delay to slow down loop speed to prevent free run in debug testing
+// The rain and wind speed sensors use interrupts, and so data is collected "in the background", these sensors ate taken care of.
 }
