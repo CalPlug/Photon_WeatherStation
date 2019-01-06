@@ -11,13 +11,16 @@
 //  with porting to Photon by Rickkas7: https://github.com/rickkas7/TCA9548A-RK  
 // The weather shild base project was developed by N. Seidle of SparkFun.
 //brownout protection by JVanier: https://community.particle.io/t/eeprom-persistence-issue/16514/39
+//other code components used from other sources are cited in-line.
 //
-// Authors:
+// Project Authors:
 //	- Sid Kasat, CS Junior @ UC Irvine
 //	- Mindy Saylors, EE Junior @ UC Irvine
+//  - Jigar Hira, EE Sophomore @ UC Irvine
+//  - Michael Klopfer, PhD, CalPlug/Calit2 Technical Director, UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
-//California Institute for Telecommunications and Information Technology (Calit2), 2017-2018
+//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.5)
 //University of California, Irvine
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
@@ -46,26 +49,26 @@
 #include <TCA9548A-RK.h>
 
 //***************Required to allow operation on Particle Photon even if connection is down.  Without this the geiger counter will come active and drain batteries when connection drops, for implementation notes, see: https://community.particle.io/t/solved-make-photon-run-code-without-being-necessarily-connected-to-the-particle-cloud/25953/2
-SYSTEM_MODE (SEMI_AUTOMATIC)//statement show in examples with and without semicolons in use, note, the sensor diag messages can be missed in this mode!!
-SYSTEM_THREAD (ENABLED) //statement show in examples with and without semicolons in use
+SYSTEM_MODE (SEMI_AUTOMATIC)//statement show in examples with and without semicolons in use, note, the sensor diag messages can be missed in this mode!!  See details:  https://docs.particle.io/support/troubleshooting/mode-switching/photon/
+SYSTEM_THREAD (ENABLED) //statement show in examples with and without semicolons in use, run in two threads by RTOS, details:  https://docs.particle.io/reference/device-os/firmware/photon/#system-thread
 
-boolean connectToCloud = false; //n semi-auto mode the connection needs to be started and managed by the user code.  This is the indicator for cloud status connection request
+//Wifi Toggle for Photon Cloud reconnect holders 
+boolean connectToCloud = false; //In semi-auto mode the connection needs to be started and managed by the user code.  This is the indicator for cloud status connection request
 const uint32_t msRetryDelay = 5*60000; // retry every 5min 
 const uint32_t msRetryTime  =   30000; // stop trying after 30sec
-
 bool retryRunning = false;
 Timer retryTimer(msRetryDelay, retryConnect);  // timer to retry connecting
 Timer stopTimer(msRetryTime, stopConnect);     // timer to stop a long running try
 //*******************
 
-
+//Initialize I2C Hardware
 TCA9548A mux(Wire, 0); //Initiaalize the I2C Multiplexer with default settings
-
 Weather sensor; //Create Instance of HTU21D or SI7021 temp and humidity sensor and MPL3115A2 barometric sensor
 Adafruit_SI1145 uv = Adafruit_SI1145(); //create object for UV, there is a test at this point but the I2C is not set yet
+
+//Function prototypes
 void callback(char* topic, byte* payload, unsigned int length); //Function Prototype for MQTT callback for subscribe functionality
 
-	
 //Interface Ports & Pins
 const int GeigerPowerPin = D7; //this is the source for the enable pin (required as inverted) used to turn on the power regulator to supply the geiger counter with power
 const int RainPin = D2;
@@ -93,7 +96,9 @@ bool GEIGER_READING= false; //start with the geiger counter set to off
 long int geigerreportruncounter = 0; //record for number of times to read from serial port to try to publish
 long int geigerreportserialreadruncounter = 0; //record for number of times to read from serial port
 
+
 //Global values for functions
+
 //Temp and Humidity sensor + Pressure Sensor
 float humidityRHTotal = 0.0;
 unsigned int humidityRHReadingCount = 0;
@@ -107,9 +112,8 @@ float partialpressureH2Osat = 0.0;
 float dewpointC = 0.0;
 float dewpointF = 0.0;
 unsigned int pressurePascalsReadingCount = 0;
-int conntectattempt=0;
+int conntectattempt=0; //attempts for connection retry
 int mqttconntectionretries = 20; //try count to test connection to MQTT broker before incrementing a failed test.
-
 
 //Rain Sensor
 volatile unsigned int rainEventCount;
@@ -154,6 +158,7 @@ float windDegreesrec = 0;
 float UVIndexrec = 0; //return averaged values for UV (remember to div by 100 for index!)
 float visrec = 0; //return averaged values for Vis
 float IRrec = 0; //return averaged values for IR
+
 
 
 //*************************Functions*******************************
@@ -216,7 +221,6 @@ void printBrownOutResetLevel() //Used to protect code operation if voltage drops
   Serial.println("");
 }
 
-
 void setBrowoutResetLevel()  //Used to protect code operation if voltage drops too low because of limited solar
 {
   const uint8_t desiredBOR = OB_BOR_LEVEL3;
@@ -248,12 +252,12 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
   Serial.println("");
 }
 
-
 //===========================================================
 // MQTT Client
 //===========================================================
  void callback(char* topic, byte* payload, unsigned int length) // dont need current function for basic operation-- used for subscribe, this is from the example, but can be adapted later
  {
+     //loopback test for MQTT subscribe function, currently not used.
      char p[length + 1];
      memcpy(p, payload, length);
      p[length] = NULL;
@@ -275,19 +279,19 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("m12XXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup
+ MQTT client("m12XXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup: server, port, type
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXXXX");
+     client.connect("m12XXXXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
-     if (client.isConnected()) 
-     {
-       client.publish("Weather_Station/CONNECTION_STATUS","Connected"); //Send on connection point to MQTT
-       Particle.publish(String::format("MQTT Connection Established! (Publish@ %f Min. Runtime)", (float(millis())/60000.0)));
-     }
+         if (client.isConnected()) 
+         {
+           client.publish("Weather_Station/CONNECTION_STATUS","Connected"); //Send on connection point to MQTT
+           Particle.publish(String::format("MQTT Connection Established! (Published @ %f Min. Runtime)", (float(millis())/60000.0)));
+         }
  }
 
 
@@ -805,7 +809,7 @@ int j=0; //serial attempts
 //*****************Equivelant of uv.begin() in the Adafruit SI1145 library, but without the restart of wire.begin() and the initial test read check for 0x45 from 0x00*****************
 bool initializeUV()
 {
-    //I2C SI1145 UV Sensor Parameters - from library
+    //I2C SI1145 UV Sensor Parameters - from library, this has to be in here as the initialization of the library causes an Issue witha  device conflict before the I2C switch is initialized.  Rather than forking the library, we introduced some of the library functions into the main code here:
     /* COMMANDS */
     #define SI1145_PARAM_QUERY 0x80
     #define SI1145_PARAM_SET 0xA0
@@ -928,12 +932,12 @@ bool initializeUV()
     #define SI1145_ADDR 0x60
 
   uint8_t id = SI1145i2cread8(0x00); //Search for this on the 0x00 address, this is required as part of the startup
-  Particle.publish(String::format("UV Sensor ID: %u - Should be equivelant of 0x45 ",id)); //reint returned sensor value, if returned
+  Particle.publish(String::format("UV Sensor ID: %u - Should be equivelant of 0x45 ",id)); //reint returned sensor value, if returned  Typically 4 (in a uint8 container displayed as %u in printgf()) appears to be OK as a return
   id = 0x45; // Force this check to be true!  (see note below)
   
   if (id != 0x45) 
      {
-           return false; // (the note) look for SI1145, if the value 0x45 is not found, exit the function - this causes problems with multiple devices!  Force this to pass if it gets stuck and you know the sensor is present
+           return false; // (the note) look for SI1145, if the value 0x45 is not found, exit the function - this check causes problems with multiple devices sharing I2C addresses in this design, even when connected properly!  Force this to pass if it gets stuck and you know the sensor is present
      }
      
   //Apply the reset sequence
@@ -1009,7 +1013,7 @@ bool initializeUV()
 }
 //****************************************************************************************
 
-
+//use median values for this sensor to avoid value jumping for light sensor - median of three sucessive reads.
 float getUV()
 {
 
@@ -1023,7 +1027,7 @@ float a = uv.readUV();
 float middle;
 float readval;
 
-//calculate the median value for 3 reads
+//calculate the median value for 3 reads, use standard algorithm for calculating median
 
   if ((a <= b) && (a <= c))
  {
@@ -1097,11 +1101,10 @@ float getIR()
  delay (3);
   float c = uv.readIR();
  delay (3);
- 
 float middle;
 float readval;
 
-//calculate the median value for 3 reads
+//calculate the median value for 3 reads, median function shown, use middle value
 
   if ((a <= b) && (a <= c))
  {
@@ -1148,9 +1151,9 @@ float getUVReadings()
 float getVisReadings()
 {
     //average readings from UV/ VIS/IR sensor, average and return
-   if (lightUVReadingCount ==0)
+   if (lightUVReadingCount == 0)
    {
-       lightVisReadingCount=1; //avoid div by zero if no measurements recorded
+       lightVisReadingCount = 1; //avoid div by zero if no measurements recorded
    }
       //Visible Light Level
     float vis = lightVisTotal/float(lightVisReadingCount);
@@ -1209,8 +1212,8 @@ uint8_t SI1145i2cwriteParam(uint8_t p, uint8_t v)
   return SI1145i2cread8(SI1145_REG_PARAMRD);
 }
 
-//functions to manage reconnection to Particle cloud and the Particle Photon's WiFi
 
+//functions to manage reconnection to Particle cloud and the Particle Photon's WiFi for semi-auto mode operation - toggle WiFi functions
 void retryConnect()  //see here for details: https://community.particle.io/t/solved-make-photon-run-code-without-being-necessarily-connected-to-the-particle-cloud/25953/2
 {
   if (!Particle.connected())   // if not connected to cloud
@@ -1233,7 +1236,7 @@ void stopConnect()
     Serial.println("stopped");
 
     if (!Particle.connected()) // if after retryTime no connection
-      WiFi.off();              // stop trying and swith off WiFi
+    WiFi.off();              // stop trying and swith off WiFi
     stopTimer.stop();
 }
 
@@ -1322,38 +1325,44 @@ void loop()
 		    IRrec = getIRReadings(); //return averaged values for IR
 		    
         }
-        if (client.isConnected())
+        //at this point see if the particle connection is even OK, try to reconnect here also by toggling WiFi, the check is now in the main loop in semi-auto mode, this can be reenabled if required in use
+        //if (!retryRunning && !Particle.connected())  // if we have not already scheduled a retry and are not connected to Particle Cloud, toggle WIFI and retry connection (alternative to forced restart)
+           // { 
+              //  stopTimer.start();         // set timeout for auto-retry by system
+              //  retryRunning = true;
+              //  retryTimer.start();        // schedula a retry to c
+          //  }
+        
+        if (client.isConnected()) //check to see if MQTT connection is active, if so, push, if not, try to reestablish connection.
             {
     		publishToMQTT(tempFrec, tempCrec, humidityRHrec, pressureKParec, rainInchesrec, windMPHrec, windDegreesrec,UVIndexrec/100,visrec,IRrec);
     		client.loop(); //Check with loop active, refresh connection after post,keep MQTT connection alive
     		//Serial.println("Just Published to MQTT");  //Serial DEBUG message
             }
-         else
-             {   
+         else  //try a disconnect and reconnect operation if connection is not active
+            {   
               client.disconnect();
-              delay (500); //wait ~3 seconds for disconnect to happen connection
+              delay (2000); //wait 2 seconds for disconnect to happen connection before trying a new connection
               Particle.publish(String::format("Main Publish Fail: Now %f Min. Runtime", (float(millis())/60000.0))); //notify of connection failure to MQTT Broker (provided general connectivity)
-              client.connect("m12XXX.cloudmqtt.com", "XXXXXXX", "XXXXXXXX"); //Try to reconnect for next round
-              delay (2500); //wait 2.5 seconds for connection
+              initializeCloudMQTT();  //Run connection function again
+              delay (2000); //wait 2.0 seconds for connection
               int check_connection = 0;  //declare connection checker
               
               //Test if connection goes down for a connection restore
-              int retrycounts = 0;  //reset connection retry count counter
-              while (retrycounts < mqttconntectionretries || check_connection == 0) //break the loop when connection is seen or a timeout happens
+              int retrycounts = 0;  //reset connection retry count counter before loop is entered
+              while (retrycounts < mqttconntectionretries && check_connection == 0) //try multiple timed retries to connect to MQTT broker after requesting a connection - break the loop when connection is seen or a timeout happens
               {
-               
-               
                 if(client.isConnected() == 1) //check for MQTT connection, first try
                      {
                          check_connection = 1; //connection re-established, now break the loop
                      }
                      else
                         {
-                            delay (500); //add a minor delay between checks to allow connection to be established to test
+                            delay (1000); //add a minor delay between checks to allow connection to be established to test
                         }
                   
                 retrycounts++; //loop timeout counter
-              }
+            }
                  
             if (check_connection == 1) //if connection reestablished, try to publish again, assume to this point the c
                 {
@@ -1365,28 +1374,22 @@ void loop()
                 }
                else
                 {
-                //at this point see if the particle connection is even OK, try to reconnect here also by toggling WiFi
-                //the check is now in the main loop in semi-auto mode, this can be reenabled if required in use
-                  //if (!retryRunning && !Particle.connected())
-                       // { // if we have not already scheduled a retry and are not connected
-                      //  stopTimer.start();         // set timeout for auto-retry by system
-                      //  retryRunning = true;
-                      //  retryTimer.start();        // schedula a retry to c
-                      //  }
                   conntectattempt++;
                 }
              
               if (ConnectTrysBeforeReset < conntectattempt)  //resetsystem after specified failed sequential attempts to connect
                   {
-                      //counts resets when system resets, they will accrew
+                      //counts resets when system resets, they will accrew (conntectattempt will be set to zero, no need to reset in here)
                     Particle.publish(String::format("Client Connection Could not be established, Resetting Photon: %f Min. Runtime", (float(millis())/60000.0))); //notify of connection failure to MQTT Broker (provided general connectivity)
-    		        delay(3000);
+    		        client.disconnect(); //force a disconnect (should already be disconnected)
+    		        delay(3000); //give time for any remaining signal to be sent out on another thread befpre restarting
                     System.reset(); //reset the Photon if there is no response, try again after it resets.  Eternally reset and retry connection
                   }
              }
          
         
             timeNextPublish = millis() + publishPeriod;  // Schedule the next publish event
+            connectToCloud = true; //after each post attempt, reset toggle to test the connection to the Particle Photon Cloud, this slows down the number of attempts to check connection to Photon Cloud
     }
     
     if (millis() < lastmillis)
@@ -1399,10 +1402,10 @@ void loop()
 
 // The rain and wind speed sensors use interrupts, and so data is collected "in the background", these sensors ate taken care of.
 
-//If the photon is in Semi-Auto mode, an explicit connection needs to be made to the particle cloud and checked to make sure it is live.  This is done here:
-    if(connectToCloud && Particle.connected() == false) 
+//If the photon is in Semi-Auto mode, an explicit connection needs to be made to the particle cloud and checked to make sure it is live.  This is done here when allowed during each loop operation:
+  if(connectToCloud && Particle.connected() == false) //check and retry Particle Cloud connection if it is dropped, required in semi-auto mode, check first if the toggle is set to check before polling
     {
         Particle.connect();
-        connectToCloud = false; //cancel request to try to connect
+        connectToCloud = false; //cancel request to try to connect until reset again during next publish, this slows down checking rate to limit time spent doing this.
     }
 }
