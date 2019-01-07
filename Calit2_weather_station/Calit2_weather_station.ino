@@ -20,7 +20,7 @@
 //  - Michael Klopfer, PhD, CalPlug/Calit2 Technical Director, UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
-//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.5)
+//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.501)
 //University of California, Irvine
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
@@ -166,7 +166,7 @@ void setup()
 {
   Serial.begin(9600); //required for reporting over USB
   initializeGeigerCounter();
-  delay (30);
+  delay (3000); //let sensors boot up
   Particle.connect(); //run explicit
   connectToCloud = false; //cancel request to try to connect at loop start
  //Brownout protection for solar input
@@ -284,7 +284,7 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXX");  //server, username, password
+     client.connect("m12XXXX.cloudmqtt.com", "XXXXXXX", "XXXXXXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
          if (client.isConnected()) 
