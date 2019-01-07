@@ -20,7 +20,7 @@
 //  - Michael Klopfer, PhD, CalPlug/Calit2 Technical Director, UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
-//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.501)
+//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.502)
 //University of California, Irvine
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
@@ -279,12 +279,12 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("m12XXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup: server, port, type
+ MQTT client("m12XXXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup: server, port, type
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXX.cloudmqtt.com", "XXXXXXX", "XXXXXXXXXX");  //server, username, password
+     client.connect("m12XXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
          if (client.isConnected()) 
@@ -748,6 +748,7 @@ float lookupRadiansFromRaw(unsigned int analogRaw)
 void initializeGeigerCounter()
 {
 	Serial1.begin(9600);    	//Baud rate: 9600
+	//Serial1.begin(9600, SERIAL_9N1); // via TX/RX pins, 9600 9N1 mode (shown as config example, see )https://docs.particle.io/reference/device-os/firmware/photon/#serial
 	pinMode(GeigerPowerPin, OUTPUT);
 	digitalWrite(GeigerPowerPin, HIGH); //turn off geiger counter read with HIGH (ivnverse enable on the controller)
 	return;
@@ -755,9 +756,63 @@ void initializeGeigerCounter()
 
 
 void captureGeigerValues()
+   { //Captures values (caution: uses a while loop which may disrupt timing)
+    bool dataIsNotCollected = true;		// to collect data for one line of data, initialized as true=no data collected
+    int j=0; //serial attempts counter initialization at 0
+    int looptests = 10; //number of times to run the loop to look for serial input before moving on - don't hang the code for too long here!
+    	do  //initialize the capture array with a * followed by null characters
+    	{
+    	    //bool newdata=false;
+    		int arrlen=50;
+    		char test[arrlen];
+    		test[0]='*';
+    		for (int i=1;i<arrlen;i++)
+    		{
+    		    test[i]='\0';
+    		}
+    
+    		
+    		int i=0; //characters read in
+    
+        	    while (i<arrlen && Serial1.available()) //read in and replace the * and null characters
+        	    {
+        	        char c = Serial1.read();
+        		    test[i]=c;
+        	        i++;
+        	        geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
+        		}
+       
+            	if (i>26 && (test[0]=='C' || test[0]=='*')) // PREV: i>10 (or 1>30) && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+            	{
+            	   dataIsNotCollected = false; //data was read in
+            	   // 		client.publish("Weather_Station/GEIGER_OUTPUT_TEST",test); //Prints successfully
+            	   
+            	   //                          vvv There is a race condition here. test is published successfully w/out the time check
+            	   //                          vvv                                 test gets overwritten w/ the check
+            	    if (client.isConnected()) /*&& (lastgeigerreporttime + geigerloopdelay < millis())*/ //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
+                        {
+               		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
+            	            char payload[255];
+            	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
+                            client.publish("Weather_Station/RUNTIME_MIN", payload);
+                            Particle.publish(String::format("MQTTPublish for Geiger Counter@ %f MIN Runtime", float((millis())/60000.0)));
+                            lastgeigerreporttime = millis (); //NOT USED RIGHT NOW
+                        }
+                        //the checking will be done by the other periodic function, if this fails, the other function will catch and retry a reconnect
+                    Particle.publish(String::format("Valid Geiger Counter Reading @ %f MIN Runtime", float((millis())/60000.0)));
+            	}
+    		
+    		j=j+1; //increment j, the loop timeout counter
+    	} while (dataIsNotCollected && j<looptests); //data collection timeout, either the data is caught or it times out
+    
+    	geigerreportruncounter = geigerreportruncounter+1;
+    }
+
+/*  //Legacy geiger counter function version, tested and known functional
+void captureGeigerValues()
 { //Captures values (caution: uses a while loop which may disrupt timing)
  bool dataIsNotCollected = true;		// to collect data for one line of data
-int j=0; //serial attempts
+
 	do
 	{
 	    //bool newdata=false;
@@ -769,41 +824,29 @@ int j=0; //serial attempts
 		    test[i]='\0';
 		}
 
-		
-		int i=0; //characters read in
-
-    	    while (i<arrlen && Serial1.available())
-    	    {
-    	        char c= Serial1.read();
-    	        
-    		    test[i]=c;
-    	        i++;
-    	        geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
-    		}
-   
-        	if (i>30 && (test[0]=='C' || test[0]=='*')) // PREV: i>10 && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+		int i=0;
+	    while (i<arrlen && Serial1.available())
+	    {
+	        char c= Serial1.read();
+		    test[i]=c;
+	        i++;
+		}
+        	if (i>26 && (test[0]=='C' || test[0]=='*')) //check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
         	{
-        	   dataIsNotCollected = false; //data was read in
-        	   // 		client.publish("Weather_Station/GEIGER_OUTPUT_TEST",test); //Prints successfully
-        	   
-        	   //                          vvv There is a race condition here. test is published successfully w/out the time check
-        	   //                          vvv                                 test gets overwritten w/ the check
-        	    if (client.isConnected()) /*&& (lastgeigerreporttime + geigerloopdelay < millis())*/ //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
+        	    if (client.isConnected() && (lastmillis + geigerloopdelay < millis())) //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
                     {
-           		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
+           		        client.publish("Calit2_Weather_Station/GEIGER_OUTPUT",test);
         	            char payload[255];
         	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
-                         client.publish("Weather_Station/RUNTIME_MIN", payload);
-                         Particle.publish(String::format("MQTTPublish for Geiger Counter@ %f MIN Runtime", float((millis())/60000.0)));
-                         lastgeigerreporttime = millis (); //NOT USED RIGHT NOW
+                         client.publish("Calit2_Weather_Station/RUNTIME_MIN", payload);
+                         Particle.publish(String::format("MQTTPublish@ %f MIN Runtime", (millis())/60000));
+                         lastmillis = millis (); //set new value for lastmillis, this is used to meter the rate of the loop
                     }
         	}
-		
-		j=j+1; //increment J, the loop timeout counter
-	} while (dataIsNotCollected && j<2000); //data collection timeout, either the data is caught or it times out
-
-	geigerreportruncounter = geigerreportruncounter+1;
+		dataIsNotCollected = false;
+	} while (dataIsNotCollected);
 }
+*/
 
 
 //*****************Equivelant of uv.begin() in the Adafruit SI1145 library, but without the restart of wire.begin() and the initial test read check for 0x45 from 0x00*****************
