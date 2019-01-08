@@ -20,7 +20,7 @@
 //  - Michael Klopfer, PhD, CalPlug/Calit2 Technical Director, UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
-//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.502)
+//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.503)
 //University of California, Irvine
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
@@ -165,9 +165,10 @@ float IRrec = 0; //return averaged values for IR
 void setup() 
 {
   Serial.begin(9600); //required for reporting over USB
+  Serial1.begin(9600, SERIAL_8N1); //start communication for Geiger Counter input with 9600 bps, 8/N/1 Serial settings (RX and TX pins)
   initializeGeigerCounter();
-  delay (3000); //let sensors boot up
-  Particle.connect(); //run explicit
+  Particle.connect(); //run explicit connection to Particle Cloud (required in semi-auto mode)
+  delay (3000); //let sensors boot up and WiFi connection start the process
   connectToCloud = false; //cancel request to try to connect at loop start
  //Brownout protection for solar input
   printBrownOutResetLevel();
@@ -284,7 +285,7 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXXX");  //server, username, password
+     client.connect("m12XXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
          if (client.isConnected()) 
@@ -747,7 +748,7 @@ float lookupRadiansFromRaw(unsigned int analogRaw)
 //When no value is vailable, only * is returned
 void initializeGeigerCounter()
 {
-	Serial1.begin(9600);    	//Baud rate: 9600
+	//Serial1.begin(9600);    	//Baud rate: 9600 - initalize above in setup
 	//Serial1.begin(9600, SERIAL_9N1); // via TX/RX pins, 9600 9N1 mode (shown as config example, see )https://docs.particle.io/reference/device-os/firmware/photon/#serial
 	pinMode(GeigerPowerPin, OUTPUT);
 	digitalWrite(GeigerPowerPin, HIGH); //turn off geiger counter read with HIGH (ivnverse enable on the controller)
@@ -757,55 +758,46 @@ void initializeGeigerCounter()
 
 void captureGeigerValues()
    { //Captures values (caution: uses a while loop which may disrupt timing)
-    bool dataIsNotCollected = true;		// to collect data for one line of data, initialized as true=no data collected
-    int j=0; //serial attempts counter initialization at 0
-    int looptests = 10; //number of times to run the loop to look for serial input before moving on - don't hang the code for too long here!
-    	do  //initialize the capture array with a * followed by null characters
+    int arrlen=50; //read buffer array length
+    int q=0; //characters read in from accumulated serial buffer, start count at 0
+    
+    //Initialize read array:
+	char test[arrlen];
+	test[0]='*'; //check character at array start
+	for (int i=1;i<arrlen;i++)
     	{
-    	    //bool newdata=false;
-    		int arrlen=50;
-    		char test[arrlen];
-    		test[0]='*';
-    		for (int i=1;i<arrlen;i++)
-    		{
-    		    test[i]='\0';
-    		}
-    
-    		
-    		int i=0; //characters read in
-    
-        	    while (i<arrlen && Serial1.available()) //read in and replace the * and null characters
-        	    {
-        	        char c = Serial1.read();
-        		    test[i]=c;
-        	        i++;
-        	        geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
-        		}
-       
-            	if (i>26 && (test[0]=='C' || test[0]=='*')) // PREV: i>10 (or 1>30) && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
-            	{
-            	   dataIsNotCollected = false; //data was read in
-            	   // 		client.publish("Weather_Station/GEIGER_OUTPUT_TEST",test); //Prints successfully
-            	   
-            	   //                          vvv There is a race condition here. test is published successfully w/out the time check
-            	   //                          vvv                                 test gets overwritten w/ the check
-            	    if (client.isConnected()) /*&& (lastgeigerreporttime + geigerloopdelay < millis())*/ //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
-                        {
-               		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
-            	            char payload[255];
-            	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
-                            client.publish("Weather_Station/RUNTIME_MIN", payload);
-                            Particle.publish(String::format("MQTTPublish for Geiger Counter@ %f MIN Runtime", float((millis())/60000.0)));
-                            lastgeigerreporttime = millis (); //NOT USED RIGHT NOW
-                        }
-                        //the checking will be done by the other periodic function, if this fails, the other function will catch and retry a reconnect
-                    Particle.publish(String::format("Valid Geiger Counter Reading @ %f MIN Runtime", float((millis())/60000.0)));
-            	}
-    		
-    		j=j+1; //increment j, the loop timeout counter
-    	} while (dataIsNotCollected && j<looptests); //data collection timeout, either the data is caught or it times out
-    
-    	geigerreportruncounter = geigerreportruncounter+1;
+	     test[i]='\0';
+	    }
+	    
+    //Read in the accumulated serial buffer
+    while (q<arrlen && Serial1.available()>0) //read in and replace the * and null characters
+        {
+        char c = Serial1.read(); //read in characters one by one
+	    test[q] = c;
+        q++; //increment array index
+        geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
+	    }
+
+    //check to see if the buffer has valid data in it, see if characters read in are valid to report
+	if (q>29 && (test[0]=='C'|| test[0]=='*') ) // PREV: i>10 (or 1>30) && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+	    {
+	   
+	   //                          vvv There is a race condition here. test is published successfully w/out the time check
+	   //                          vvv                                 test gets overwritten w/ the check
+	    if (client.isConnected()) /*&& (lastgeigerreporttime + geigerloopdelay < millis())*/ //Only report if new data is collected and the client is available, the geiger reports every second, so this should catch it, once per reading and restrict to reporting every 5 seconds
+            {
+   		        client.publish("Weather_Station/GEIGER_OUTPUT",test);
+	            char payload[255];
+	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
+                client.publish("Weather_Station/RUNTIME_MIN", payload);
+                Particle.publish(String::format("MQTTPublish for Geiger Counter@ %f MIN Runtime", float((millis())/60000.0)));
+                lastgeigerreporttime = millis (); //NOT USED RIGHT NOW
+            }
+            //the checking will be done by the other periodic function, if this fails, the other function will catch and retry a reconnect
+        Particle.publish(String::format("Valid Geiger Counter Reading @ %f MIN Runtime", float((millis())/60000.0)));
+	    }
+    geigerreportruncounter = geigerreportruncounter+1;
+    while(Serial1.read() >= 0); //Flush buffer fully by reading it out and doing nothing with it, this is quick, try to flush to get a clean start for next run
     }
 
 /*  //Legacy geiger counter function version, tested and known functional
