@@ -20,7 +20,7 @@
 //  - Michael Klopfer, PhD, CalPlug/Calit2 Technical Director, UC Irvine
 //
 //Project Managers: Dr. Michael Klopfer, Prof. GP Li.
-//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.503)
+//California Institute for Telecommunications and Information Technology (Calit2), 2017-2019, (v.1.6)
 //University of California, Irvine
 //Extended components of project copyright Regents of the Univeristy of California and relesed into the public domain.
 //===========================================================================
@@ -85,7 +85,6 @@ int ConnectTrysBeforeReset = 20; //number of times to try a connect to MQTT befo
 //Geiger Counter reading management
 unsigned int lastmillis = millis (); //used to manage reporting of loop
 unsigned int lastgeigerreporttime = millis (); //used to manage reporting of Geiger Counter values
-const unsigned int geigerloopdelay = 3000; //period (ms) between independent reports from the geiger counter when active
 const unsigned int geigerstart = 1; // run period with reporting for the geiger counter (min)
 const unsigned int geigerdelay = 15; // delay for geiger counter (min) after first run
 const unsigned int GeigerCounterRun = 1; //time for geiger counter to pre-run before collecting data
@@ -95,6 +94,7 @@ unsigned int geigerdelta = 60000;  //period added to geiger counter start in set
 bool GEIGER_READING= false; //start with the geiger counter set to off
 long int geigerreportruncounter = 0; //record for number of times to read from serial port to try to publish
 long int geigerreportserialreadruncounter = 0; //record for number of times to read from serial port
+int geigerreportdelay = 3100; //checks if the geiger counter reported sucessfully
 
 
 //Global values for functions
@@ -285,7 +285,7 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXXX.cloudmqtt.com", "XXXXXXXXX", "XXXXXXXXXXX");  //server, username, password
+     client.connect("m12XXXXXX.cloudmqtt.com", "XXXXXXXX", "XXXXXXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
          if (client.isConnected()) 
@@ -758,6 +758,9 @@ void initializeGeigerCounter()
 
 void captureGeigerValues()
    { //Captures values (caution: uses a while loop which may disrupt timing)
+   
+   //Serial.printlnf("STARTED");
+   
     int arrlen=50; //read buffer array length
     int q=0; //characters read in from accumulated serial buffer, start count at 0
     
@@ -768,19 +771,37 @@ void captureGeigerValues()
     	{
 	     test[i]='\0';
 	    }
-	    
-    //Read in the accumulated serial buffer
-    while (q<arrlen && Serial1.available()>0) //read in and replace the * and null characters
-        {
-        char c = Serial1.read(); //read in characters one by one
-	    test[q] = c;
-        q++; //increment array index
-        geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
-	    }
-
+	  
+	long int mil = millis(); 
+	bool escape = false;
+	
+	while(Serial1.read() >= 0); //Flush buffer fully by reading it out and doing nothing with it, this is quick, try to flush to get a clean start for next run
+	   
+	do
+	{
+        //Read in the accumulated serial buffer
+        while (q<arrlen && Serial1.available()>0) //read in and replace the * and null characters
+            {
+            char c = Serial1.read(); //read in characters one by one
+    	    test[q] = c;
+    	    
+    	    if (c == 'W' || c == 'T')
+    	    {
+    	        escape = true;
+    	    }
+    	    
+            q++; //increment array index
+            geigerreportserialreadruncounter = geigerreportserialreadruncounter+1;
+    	    }
+    	    
+    	    
+	} while (((test[0] == 'C') && (q<45) && (escape == false)) || (((mil + 150) > millis()) && (millis() > 20000))); //timeout protected from millis overrun
+	
     //check to see if the buffer has valid data in it, see if characters read in are valid to report
-	if (q>29 && (test[0]=='C'|| test[0]=='*') ) // PREV: i>10 (or 1>30) && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
+	if (q>30 && (test[0]=='C'|| test[0]=='*') ) // PREV: i>10 (or 1>30) && (test[0]=='C' || test[0]=='*')check for min length for valid response, and if the C (for CPM, the first characters of the response) or * characters are present indicating a valid return
 	    {
+	        
+	        //Serial.printlnf("%s", test); /* SERIAL TEST */
 	   
 	   //                          vvv There is a race condition here. test is published successfully w/out the time check
 	   //                          vvv                                 test gets overwritten w/ the check
@@ -791,13 +812,13 @@ void captureGeigerValues()
 	            snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000);
                 client.publish("Weather_Station/RUNTIME_MIN", payload);
                 Particle.publish(String::format("MQTTPublish for Geiger Counter@ %f MIN Runtime", float((millis())/60000.0)));
-                lastgeigerreporttime = millis (); //NOT USED RIGHT NOW
+                lastgeigerreporttime = millis();
             }
             //the checking will be done by the other periodic function, if this fails, the other function will catch and retry a reconnect
         Particle.publish(String::format("Valid Geiger Counter Reading @ %f MIN Runtime", float((millis())/60000.0)));
 	    }
     geigerreportruncounter = geigerreportruncounter+1;
-    while(Serial1.read() >= 0); //Flush buffer fully by reading it out and doing nothing with it, this is quick, try to flush to get a clean start for next run
+    
     }
 
 /*  //Legacy geiger counter function version, tested and known functional
@@ -1315,7 +1336,7 @@ void loop()
 	{ // turn on geiger counter
 	    GEIGER_READING=true;
 		digitalWrite(GeigerPowerPin, LOW); //enable geiger counter, this happens when GEIGER_READING=true;
-		if(timeNextGeigerReading+(60000*GeigerCounterRun) <= millis()) //pre-run length for geiger counter before reading
+		if((timeNextGeigerReading+(60000*GeigerCounterRun) <= millis()) && ((lastgeigerreporttime + geigerreportdelay) < millis()) ) //pre-run length for geiger counter before reading
 		{ // start taking data after a minute
 			GEIGER_READING=true; //redundant
 		    digitalWrite(GeigerPowerPin, LOW); //enable geiger counter, this happens when GEIGER_READING=true;  //redundant
