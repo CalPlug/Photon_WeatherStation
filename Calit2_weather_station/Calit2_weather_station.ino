@@ -56,6 +56,13 @@ SYSTEM_THREAD (ENABLED) //statement show in examples with and without semicolons
 boolean connectToCloud = false; //In semi-auto mode the connection needs to be started and managed by the user code.  This is the indicator for cloud status connection request
 const uint32_t msRetryDelay = 5*60000; // retry every 5min 
 const uint32_t msRetryTime  =   30000; // stop trying after 30sec
+unsigned long cloudlastcommtime = 0;  //holder for last time value when particle connection was observed
+unsigned long cloudreboottimeout = (60*1000)*10; //timout in 10 minutes and reset if no connection is made, try to recconect on next reboot
+unsigned long cloudconnectiontestperiod = (60*1000)*5;  //check for conenction every 2 minutes
+unsigned int cloudconnectionretryperiodcounter = 0;  //connection time period counter
+unsigned long lastcloudconnectretry = 0; //counter to hold millis value to retry particle cloud connection
+int cloudconnectretryattemptsallowed = 20; //connection attempts before a reset is performed
+long msRetryDelayreconnect = (60*1000)*2; //retry every 2 min
 bool retryRunning = false;
 Timer retryTimer(msRetryDelay, retryConnect);  // timer to retry connecting
 Timer stopTimer(msRetryTime, stopConnect);     // timer to stop a long running try
@@ -89,9 +96,9 @@ const unsigned int geigerstart = 1; // run period with reporting for the geiger 
 const unsigned int geigerdelay = 15; // delay for geiger counter (min) after first run
 const unsigned int GeigerCounterRun = 1; //time for geiger counter to pre-run before collecting data
 const unsigned int GeigerInitialDelay = 120000;  //time in ms to initial geiger preclusion period startup after a restart
-unsigned int timeNextGeigerReading = 0;  //inititalize variable - period used for timing the next reading of the geiger counter
-unsigned int geigerdelta = 60000;  //period added to geiger counter start in setup to make the new "timeNextGeigerReading" value (ms), added delay (and somewhat redundant to GeigerInitialDelay), needs to be beyond the start point after exclusion period so it doesnt get left behind and not run the sequential if statements required to update value
-bool GEIGER_READING= false; //start with the geiger counter set to off
+unsigned long timeNextGeigerReading = 0;  //inititalize variable - period used for timing the next reading of the geiger counter
+unsigned long geigerdelta = 60000;  //period added to geiger counter start in setup to make the new "timeNextGeigerReading" value (ms), added delay (and somewhat redundant to GeigerInitialDelay), needs to be beyond the start point after exclusion period so it doesnt get left behind and not run the sequential if statements required to update value
+bool GEIGER_READING = false; //start with the geiger counter set to off
 long int geigerreportruncounter = 0; //record for number of times to read from serial port to try to publish
 long int geigerreportserialreadruncounter = 0; //record for number of times to read from serial port
 int geigerreportdelay = 3100; //checks if the geiger counter reported sucessfully
@@ -113,7 +120,7 @@ float dewpointC = 0.0;
 float dewpointF = 0.0;
 unsigned int pressurePascalsReadingCount = 0;
 int conntectattempt=0; //attempts for connection retry
-int mqttconntectionretries = 20; //try count to test connection to MQTT broker before incrementing a failed test.
+int mqttconntectionretries = 35; //try count to test connection to MQTT broker before incrementing a failed test.
 
 //Rain Sensor
 volatile unsigned int rainEventCount;
@@ -164,12 +171,13 @@ float IRrec = 0; //return averaged values for IR
 //*************************Functions*******************************
 void setup() 
 {
+  WiFi.selectAntenna(ANT_EXTERNAL); //explicit call for external antenna use on Particle Photon, alternatively:   //WiFi.selectAntenna(ANT_AUTO); //select auto antenna when external one is in use, it will try this)
   Serial.begin(9600); //required for reporting over USB
   Serial1.begin(9600, SERIAL_8N1); //start communication for Geiger Counter input with 9600 bps, 8/N/1 Serial settings (RX and TX pins)
   initializeGeigerCounter();
-  Particle.connect(); //run explicit connection to Particle Cloud (required in semi-auto mode)
+  Particle.connect(); //run explicit connection to Particle Cloud (required in semi-auto mode), this is the first connection try
   delay (3000); //let sensors boot up and WiFi connection start the process
-  connectToCloud = false; //cancel request to try to connect at loop start
+  connectToCloud = false; //cancel request to try to connect at loop start - keep it as false at this point, this skips check until report
  //Brownout protection for solar input
   printBrownOutResetLevel();
   setBrowoutResetLevel();
@@ -280,12 +288,12 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
          //Serial.println("MQTT Subscribe Read: Nothing RCVD");  //Default Case, commented to prevent constant reporting as it is not in use
      }
  }
- MQTT client("m12XXXXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup: server, port, type
+ MQTT client("XXXX.cloudmqtt.com", 14668, callback);  //NOTE:  Object created after the callback is setup: server, port, type
  
  
  void initializeCloudMQTT() 
  {
-     client.connect("m12XXXXXX.cloudmqtt.com", "XXXXXXXX", "XXXXXXXXXX");  //server, username, password
+     client.connect("XXXXX.cloudmqtt.com", "XXXUSERXXX", "XXXXXPASSXXXXX");  //server, username, password
     // publish/subscribe
         delay (500); //get connection established, don't take too long for timeout
          if (client.isConnected()) 
@@ -391,8 +399,13 @@ void setBrowoutResetLevel()  //Used to protect code operation if voltage drops t
  	snprintf(payload, sizeof(payload), "%0.2f", float(millis())/60000.0);
  	client.publish("Weather_Station/RUNTIME_MIN", payload);
  	client.loop();  //keepalive for MQTT
- 	Particle.publish(String::format("MQTTPublish for Senor Reporting: %f MIN Runtime", (float(millis())/60000.0)));
- 	Particle.publish(String::format("Geiger Counter Active in Last Publish?: %d", (GEIGER_READING)));
+ 	
+ 	if (Particle.connected() == true)
+       {
+            cloudconnectionretryperiodcounter = 0; //reset retry counter for cloud connection
+     	    Particle.publish(String::format("MQTTPublish for Senor Reporting: %f MIN Runtime", (float(millis())/60000.0)));
+ 	        Particle.publish(String::format("Geiger Counter Active in Last Publish?: %d", (GEIGER_READING)));
+       }
  }
 
 
@@ -1396,12 +1409,13 @@ void loop()
     		//Serial.println("Just Published to MQTT");  //Serial DEBUG message
             }
          else  //try a disconnect and reconnect operation if connection is not active
-            {   
+            {  
+
               client.disconnect();
               delay (2000); //wait 2 seconds for disconnect to happen connection before trying a new connection
               Particle.publish(String::format("Main Publish Fail: Now %f Min. Runtime", (float(millis())/60000.0))); //notify of connection failure to MQTT Broker (provided general connectivity)
               initializeCloudMQTT();  //Run connection function again
-              delay (2000); //wait 2.0 seconds for connection
+              delay (4000); //wait 2.0 seconds for connection
               int check_connection = 0;  //declare connection checker
               
               //Test if connection goes down for a connection restore
@@ -1445,7 +1459,7 @@ void loop()
          
         
             timeNextPublish = millis() + publishPeriod;  // Schedule the next publish event
-            connectToCloud = true; //after each post attempt, reset toggle to test the connection to the Particle Photon Cloud, this slows down the number of attempts to check connection to Photon Cloud
+    connectToCloud = true; //after each post attempt, reset toggle to test the connection to the Particle Photon Cloud, this slows down the number of attempts to check connection to Photon Cloud, it will do a quick check to see if still connected each time a post is tried.
     }
     
     if (millis() < lastmillis)
@@ -1453,15 +1467,37 @@ void loop()
           lastmillis  =  millis();  //millis() roll over protection
           timeNextPublish =  millis() + publishPeriod;  //millis() roll over protection
           lastgeigerreporttime = millis(); 
+          lastcloudconnectretry  = millis();
+          cloudlastcommtime = millis();
           timeNextGeigerReading = millis() + geigerdelta;
+          cloudconnectionretryperiodcounter = 0; //reset counter if there is a rollover
         }
 
 // The rain and wind speed sensors use interrupts, and so data is collected "in the background", these sensors ate taken care of.
 
 //If the photon is in Semi-Auto mode, an explicit connection needs to be made to the particle cloud and checked to make sure it is live.  This is done here when allowed during each loop operation:
-  if(connectToCloud && Particle.connected() == false) //check and retry Particle Cloud connection if it is dropped, required in semi-auto mode, check first if the toggle is set to check before polling
+  if(connectToCloud && (millis()>lastcloudconnectretry) && Particle.connected() == false) //check and retry Particle Cloud connection if it is dropped, required in semi-auto mode, check first if the toggle is set to check before polling
     {
         Particle.connect();
-        connectToCloud = false; //cancel request to try to connect until reset again during next publish, this slows down checking rate to limit time spent doing this.
+        connectToCloud = false; //cancel request to try to connect until reset again during next publish, this slows down checking rate to limit time spent doing this
+        lastcloudconnectretry = msRetryDelayreconnect+millis(); //millis overflow caught by other function, no protection on this one - slows down use of this function
+        //keep retrying eternally, the failure for MQTT connection after an exteended period will trigger a reset if needed.
+        cloudconnectionretryperiodcounter = (cloudconnectionretryperiodcounter+1); //index counter if connection is lost
     }
+    else
+    {
+       if ((millis()>cloudconnectiontestperiod+cloudlastcommtime) && Particle.connected() == true)
+       {
+           cloudlastcommtime = millis(); 
+           cloudconnectionretryperiodcounter = 0; //reset retry counter for cloud connection
+       }
+    }
+    
+  if (cloudconnectretryattemptsallowed<cloudconnectionretryperiodcounter) //This is a fail-safe that should only be hit if there is a chronic connection issue, this forces a reset of the board if there is no connection established - check to see if the number of timeouts is greater than the period, indicating that there is no consistant connection
+    {
+ 	    client.disconnect(); //force a disconnect (should already be disconnected)
+        delay(5000); //give time for any remaining signal to be sent out on another thread befpre restarting, there shouldn't be anything if no connection
+        System.reset(); //reset the Photon if there is no response, try again after it resets.  Eternally reset and retry connection   
+    }
+
 }
